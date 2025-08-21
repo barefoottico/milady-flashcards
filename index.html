@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Milady Barber Flashcards — Multi-CSV</title>
+<title>Milady Barber Flashcards — Multi-CSV (Auto-load)</title>
 <style>
   /* THEME TOKENS — dark defaults; light overrides below via [data-theme="light"] */
   :root{
@@ -44,11 +44,6 @@
     background:var(--soft); border:1px solid var(--border);
     padding:8px 12px; border-radius:999px; color:var(--muted); font-size:.9rem;
   }
-  input[type="file"]{
-    display:inline-block; color:var(--ink); background:var(--soft);
-    border:1px dashed var(--border); padding:10px 12px; border-radius:12px;
-  }
-
   main .panel{
     background:var(--card); border:1px solid var(--border);
     border-radius:var(--radius); box-shadow:var(--shadow); padding:20px;
@@ -163,20 +158,18 @@
     <div class="wrap">
       <div class="row">
         <h1>Milady Barber Flashcards</h1>
-        <span class="pill">Multi-CSV • No backend</span>
+        <!-- (blurb removed) -->
         <div class="spacer"></div>
 
         <!-- Theme toggle -->
         <button id="themeToggle" class="ghost" aria-pressed="false" title="Toggle color theme">☀️ Light</button>
 
-        <!-- Load CSVs (multi) -->
-        <label for="csvInput" class="pill" aria-label="Load CSVs">Load CSVs</label>
-        <input id="csvInput" type="file" accept=".csv" multiple aria-label="Choose one or more CSV files" />
+        <!-- (Upload controls removed) -->
 
         <!-- Datasets manager -->
         <button id="datasetsBtn" class="ghost" disabled title="Manage selected datasets">Manage Sets</button>
 
-        <!-- Mode toggle (disabled until at least one dataset selected) -->
+        <!-- Mode toggle -->
         <div class="mode-toggle" role="tablist" aria-label="Mode">
           <button id="modeOpen" role="tab" aria-pressed="false" disabled>Open Play</button>
           <button id="modeTest" role="tab" aria-pressed="false" disabled>Test Mode</button>
@@ -189,17 +182,11 @@
   </header>
 
   <main class="wrap">
-    <!-- Friendly preload screen -->
+    <!-- Preload (no upload CTA anymore) -->
     <section id="screenPreload" class="panel center">
       <div>
-        <h2>Please load dataset(s)</h2>
-        <p class="muted">Use <b>Load CSVs</b> and select one or more CSV files.<br>
-          Files must include columns: <code>id, type, question, option_a, option_b, option_c, option_d, option_e, correct_options, source, topic</code>.
-        </p>
-        <div class="cta">
-          <button class="primary" aria-describedby="csvHelp" onclick="document.getElementById('csvInput').click()">Load CSVs</button>
-          <span id="csvHelp" class="muted" aria-hidden="true">Parses locally; no upload to a server.</span>
-        </div>
+        <h2>Loading datasets…</h2>
+        <p class="muted">This page auto-loads study sets hosted with it.</p>
       </div>
     </section>
 
@@ -319,15 +306,15 @@ function parseCSV(text){
 }
 
 /* ============
-   App State (now with datasets)
+   App State (datasets + modes)
    ============ */
 const state = {
-  loaded:false,                 // true when at least one dataset selected & combined
-  datasets:[],                  // [{ name, rows:[normalized], count }]
-  selected:new Set(),           // names of datasets selected for current run
-  mode:null,                    // 'open' | 'test' | null
-  questions:[],                 // combined rows from selected datasets
-  order:[],                     // shuffled order indexes
+  loaded:false,
+  datasets:[],          // [{ name, rows:[normalized], count }]
+  selected:new Set(),   // names of datasets selected
+  mode:null,            // 'open' | 'test' | null
+  questions:[],         // combined rows from selected datasets
+  order:[],             // shuffled order
   current:0,
   flipped:false,
   answers:new Map(),
@@ -341,7 +328,6 @@ function resetRunKeepData(){
   state.flipped = false;
   state.answers.clear();
 }
-
 function shuffle(arr){
   for(let i=arr.length-1;i>0;i--){
     const j = Math.floor(Math.random()*(i+1));
@@ -354,35 +340,30 @@ function shuffle(arr){
    Data Normalization & Validation
    ============ */
 const REQUIRED_COLS = ["id","type","question","option_a","option_b","option_c","option_d","option_e","correct_options","source","topic"];
-
 function normalizeRows(rawRows, datasetName){
   const missing = REQUIRED_COLS.filter(k => !(k in (rawRows[0]||{})));
   if(missing.length){ throw new Error("Missing columns: " + missing.join(", ")); }
-
   const mapped = rawRows.map(r => {
     const options = [];
     const pushOpt = (letter, text) => { const t=(text||"").trim(); if(t) options.push({letter, text:t}); };
     pushOpt('A', r.option_a); pushOpt('B', r.option_b); pushOpt('C', r.option_c);
     pushOpt('D', r.option_d); pushOpt('E', r.option_e);
-
     const corrLetters = (r.correct_options||"").toUpperCase().replace(/[^A-E]/g,'').split('')
       .filter((v,i,a)=>a.indexOf(v)===i);
-
     return {
-      id: (r.id||"").trim(),
-      type: (r.type||"").trim(),
-      question: (r.question||"").trim(),
+      id:(r.id||"").trim(),
+      type:(r.type||"").trim(),
+      question:(r.question||"").trim(),
       options,
-      correctLetters: corrLetters.length ? corrLetters : [],
+      correctLetters:corrLetters.length?corrLetters:[],
       correctPrimary: corrLetters.find(l => options.some(o=>o.letter===l)) || null,
-      source: (r.source||"").trim(),
-      topic: (r.topic||"").trim(),
-      dataset: datasetName
+      source:(r.source||"").trim(),
+      topic:(r.topic||"").trim(),
+      dataset:datasetName
     };
   }).filter(o => o.id && o.question);
   return mapped;
 }
-
 function validateRow(row){
   if(!row) return "That question is not in the provided list.";
   if(!row.id || !row.question) return "That question is not in the provided list.";
@@ -406,7 +387,6 @@ function rebuildActiveQuestions(){
    DOM Refs
    ============ */
 const el = {
-  csvInput: document.getElementById('csvInput'),
   screenPreload: document.getElementById('screenPreload'),
   screenDatasets: document.getElementById('screenDatasets'),
   dsList: document.getElementById('dsList'),
@@ -467,7 +447,6 @@ const el = {
 /* ============
    Event Wiring
    ============ */
-el.csvInput.addEventListener('change', handleCSVLoadMultiple);
 el.datasetsBtn.addEventListener('click', () => { renderDatasetsScreen(); showScreen('datasets'); });
 el.quickManageBtn.addEventListener('click', () => { renderDatasetsScreen(); showScreen('datasets'); });
 
@@ -502,47 +481,6 @@ el.debugBtn.addEventListener('click', () => {
   el.debugPanel.classList.toggle('show');
   renderDebug();
 });
-
-/* ============
-   Loading multiple CSVs (manual)
-   ============ */
-async function handleCSVLoadMultiple(){
-  const files = Array.from(el.csvInput.files || []);
-  if(!files.length) return;
-  await addDatasetsFromFiles(files);
-  renderDatasetsScreen();
-  showScreen('datasets');
-  updateEnablement();
-}
-
-function readFileAsText(file){
-  return new Promise((resolve,reject)=>{
-    const r = new FileReader();
-    r.onload = e => resolve(String(e.target.result||""));
-    r.onerror = reject;
-    r.readAsText(file);
-  });
-}
-
-async function addDatasetsFromFiles(files){
-  for(const file of files){
-    try{
-      const text = await readFileAsText(file);
-      const raw = parseCSV(text);
-      const rows = normalizeRows(raw, file.name);
-      if(!rows.length) continue;
-      // Replace dataset with same name if exists
-      const idx = state.datasets.findIndex(d => d.name === file.name);
-      const dsObj = { name:file.name, rows, count:rows.length };
-      if(idx>=0) state.datasets[idx] = dsObj; else state.datasets.push(dsObj);
-      // Select new dataset by default
-      state.selected.add(file.name);
-    }catch(err){
-      alert(`Error in "${file.name}": ${err.message}`);
-      console.error(err);
-    }
-  }
-}
 
 /* ============
    Auto-load CSVs hosted alongside index.html
@@ -592,7 +530,6 @@ function showScreen(which){
   else if(which==='test') el.screenTest.classList.remove('hidden');
   else if(which==='results') el.screenResults.classList.remove('hidden');
 }
-
 function updateEnablement(){
   const hasAnyDS = state.datasets.length > 0;
   const hasAnySelected = state.selected.size > 0;
@@ -601,11 +538,10 @@ function updateEnablement(){
   [el.modeOpen, el.modeTest, el.resetBtn, el.startOpen, el.startTest]
     .forEach(b => b.disabled = !hasAnySelected || !state.loaded);
 }
-
 function renderDatasetsScreen(){
   el.dsList.innerHTML = "";
   if(!state.datasets.length){
-    el.dsHint.textContent = 'No datasets loaded yet. Use "Load CSVs" to add one or more files.';
+    el.dsHint.textContent = 'No datasets found here yet.';
     el.selectedSummary.textContent = '0 selected • 0 cards';
     el.applySetsBtn.disabled = true;
     return;
@@ -662,7 +598,6 @@ function renderDatasetsScreen(){
   el.selectedSummary.textContent = `${totalSelected} selected • ${totalCards} cards`;
   updateEnablement();
 }
-
 function renderModeSummary(){
   const selectedSets = state.datasets.filter(d => state.selected.has(d.name));
   const cards = selectedSets.reduce((a,b)=>a+b.count,0);
@@ -687,7 +622,6 @@ function switchMode(mode){
   }
   renderDebug();
 }
-
 function resetToModeSelection(){
   if(!state.loaded){ showScreen('datasets'); return; }
   state.mode = null;
@@ -707,7 +641,6 @@ function startOpenRun(){
   showScreen('open');
   renderOpenCard();
 }
-
 function renderOpenCard(){
   const idxQ = state.order[state.current];
   const row = state.questions[idxQ];
@@ -721,11 +654,9 @@ function renderOpenCard(){
     el.openProgress.textContent = "";
     return;
   }
-
   el.metaOpenId.textContent = `ID ${row.id}`;
   el.metaOpenSource.textContent = row.source ? `Source: ${row.source}` : "";
   el.metaOpenSet.textContent = row.dataset ? `Set: ${row.dataset}` : "";
-
   el.qTextOpen.textContent = row.question;
   el.optsOpen.innerHTML = "";
   row.options.forEach(opt => {
@@ -734,13 +665,11 @@ function renderOpenCard(){
     b.type = 'button';
     b.disabled = true;
     b.setAttribute('aria-disabled','true');
-
     const badge = document.createElement('span');
     badge.className = 'badge'; badge.textContent = opt.letter;
     const span = document.createElement('span');
     span.textContent = opt.text;
     b.appendChild(badge); b.appendChild(span);
-
     if(state.flipped && opt.letter === row.correctPrimary){
       b.classList.add('correct');
       b.setAttribute('aria-label', 'Correct answer');
@@ -749,18 +678,13 @@ function renderOpenCard(){
     }
     el.optsOpen.appendChild(b);
   });
-
   el.openProgress.textContent = `Card ${state.current+1} of ${state.order.length}`;
 }
-
 function nextOpen(){
   state.current++;
   state.flipped = false;
   el.flipBtn.setAttribute('aria-pressed','false');
-
-  if(state.current >= state.order.length){
-    resetRunKeepData();
-  }
+  if(state.current >= state.order.length){ resetRunKeepData(); }
   renderOpenCard();
 }
 
@@ -773,57 +697,38 @@ function startTestRun(reshuffle=false){
   showScreen('test');
   renderTestCard();
 }
-
 function renderTestCard(){
-  if(state.current >= state.order.length){
-    showResults();
-    return;
-  }
+  if(state.current >= state.order.length){ showResults(); return; }
   const idxQ = state.order[state.current];
   const row = state.questions[idxQ];
   const invalid = validateRow(row);
-  if(invalid){
-    state.current++;
-    renderTestCard();
-    return;
-  }
-
+  if(invalid){ state.current++; renderTestCard(); return; }
   el.metaTestId.textContent = `ID ${row.id}`;
   el.metaTestSource.textContent = row.source ? `Source: ${row.source}` : "";
   el.metaTestSet.textContent = row.dataset ? `Set: ${row.dataset}` : "";
   el.testProgress.textContent = `Card ${state.current+1} of ${state.order.length}`;
-
   el.qTextTest.textContent = row.question;
   el.optsTest.innerHTML = "";
-
   row.options.forEach(opt => {
     const btn = document.createElement('button');
     btn.className = 'opt';
     btn.type = 'button';
     btn.dataset.letter = opt.letter;
     btn.setAttribute('aria-label', `Choose option ${opt.letter}`);
-
     const badge = document.createElement('span');
     badge.className = 'badge'; badge.textContent = opt.letter;
     const span = document.createElement('span');
     span.textContent = opt.text;
     btn.appendChild(badge); btn.appendChild(span);
-
     btn.addEventListener('click', () => {
       lockChoices(el.optsTest);
       state.answers.set(idxQ, { letter: opt.letter, ts: Date.now() });
-      setTimeout(() => {
-        state.current++;
-        renderTestCard();
-      }, state.autoAdvanceMs);
+      setTimeout(() => { state.current++; renderTestCard(); }, state.autoAdvanceMs);
     });
-
     el.optsTest.appendChild(btn);
   });
-
   renderDebug();
 }
-
 function lockChoices(container){
   Array.from(container.querySelectorAll('.opt')).forEach(b => b.disabled = true);
 }
@@ -833,7 +738,6 @@ function lockChoices(container){
    ============ */
 function showResults(){
   showScreen('results');
-
   let correct = 0;
   const missed = [];
   for(const idxQ of state.order){
@@ -846,12 +750,10 @@ function showResults(){
   }
   const total = state.order.length;
   const pct = Math.round((correct / total) * 100);
-
   el.scoreBox.innerHTML = `
     <div style="font-size:1.25rem; font-weight:800">${pct}%</div>
     <div class="muted">You scored <b>${correct}</b> / ${total}</div>
   `;
-
   el.missedWrap.innerHTML = "";
   if(missed.length === 0){
     const div = document.createElement('div');
@@ -872,17 +774,14 @@ function showResults(){
       el.missedWrap.appendChild(item);
     });
   }
-
   renderDebug();
 }
-
 function getLetterAndText(row, letter){
   if(!letter) return `<i>None</i>`;
   const found = row.options.find(o => o.letter === letter);
   if(!found) return `${letter}`;
   return `<b>${letter}</b> — ${escapeHTML(found.text)}`;
 }
-
 function escapeHTML(str){
   return String(str).replace(/[&<>"']/g, m => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -890,7 +789,7 @@ function escapeHTML(str){
 }
 
 /* ============
-   THEME — persistent light/dark with OS-pref fallback
+   THEME — persistent light/dark
    ============ */
 function applyTheme(theme){
   const root = document.documentElement;
@@ -908,11 +807,8 @@ function toggleTheme(){
 function initTheme(){
   let saved = null;
   try{ saved = localStorage.getItem('mbf_theme'); }catch(e){}
-  if(saved === 'light' || saved === 'dark'){
-    applyTheme(saved);
-  }else{
-    const prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-    applyTheme(prefersLight ? 'light' : 'dark');
+  if(saved === 'light' || 'dark'){
+    applyTheme(saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
   }
 }
 
@@ -937,7 +833,7 @@ function renderDebug(){
   el.debugPre.textContent = JSON.stringify(debugObj, null, 2);
 }
 
-/* Keyboard niceties (Enter on focused option triggers click) */
+/* Keyboard niceties */
 document.addEventListener('keydown', (e) => {
   if((e.key === 'Enter' || e.key === ' ') && document.activeElement?.tagName === 'BUTTON'){
     document.activeElement.click();
@@ -950,9 +846,8 @@ document.addEventListener('keydown', (e) => {
    ============ */
 function init(){
   initTheme();
-  // Try auto-load list, then fall back if nothing found
   tryAutoLoadMany().then(() => {
-    if(state.datasets.length){ renderDatasetsScreen(); /* auto-applied in loader */ }
+    if(state.datasets.length){ renderDatasetsScreen(); }
     showScreen(state.loaded ? 'modes' : (state.datasets.length ? 'datasets' : 'preload'));
     updateEnablement();
   });
