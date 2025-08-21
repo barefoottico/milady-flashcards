@@ -504,7 +504,7 @@ el.debugBtn.addEventListener('click', () => {
 });
 
 /* ============
-   Loading multiple CSVs
+   Loading multiple CSVs (manual)
    ============ */
 async function handleCSVLoadMultiple(){
   const files = Array.from(el.csvInput.files || []);
@@ -545,10 +545,12 @@ async function addDatasetsFromFiles(files){
 }
 
 /* ============
-   Optional: auto-load CSVs hosted alongside index.html
-   Fill AUTO_CSVS with filenames, e.g.: const AUTO_CSVS = ['set1.csv','set2.csv'];
+   Auto-load CSVs hosted alongside index.html
+   >>> Set your repo filenames here <<<
    ============ */
-const AUTO_CSVS = []; // e.g., ['mbf_review_questions_exam_1.csv',]
+const AUTO_CSVS = ['mbf_review_questions_exam_1.csv'];
+
+/* Auto-loader that also applies selection and jumps to mode chooser */
 async function tryAutoLoadMany(){
   if(!AUTO_CSVS.length) return;
   const added = [];
@@ -566,13 +568,13 @@ async function tryAutoLoadMany(){
       if(i >= 0) state.datasets[i] = dsObj; else state.datasets.push(dsObj);
       state.selected.add(fname);
       added.push(fname);
-    }catch(_){}
+    }catch(_){ /* ignore missing or blocked */ }
   }
   if(added.length){
     rebuildActiveQuestions();   // combine + shuffle + mark loaded
-    renderDatasetsScreen();     // optional: keeps the manager in sync
+    renderDatasetsScreen();     // keep manager in sync
     renderModeSummary();        // show selected sets/counts
-    showScreen('modes');        // jump straight to mode choice
+    showScreen('modes');        // go straight to mode choice
     updateEnablement();         // enable buttons now that we're loaded
   }
 }
@@ -646,7 +648,6 @@ function renderDatasetsScreen(){
     removeBtn.title = 'Remove from memory';
     removeBtn.innerHTML = 'Remove';
     removeBtn.addEventListener('click', () => {
-      // remove dataset, deselect if needed
       state.datasets = state.datasets.filter(d => d.name !== ds.name);
       state.selected.delete(ds.name);
       renderDatasetsScreen();
@@ -949,10 +950,11 @@ document.addEventListener('keydown', (e) => {
    ============ */
 function init(){
   initTheme();
-  // Try auto-load list (optional)
+  // Try auto-load list, then fall back if nothing found
   tryAutoLoadMany().then(() => {
-    if(state.datasets.length){ renderDatasetsScreen(); showScreen('datasets'); }
-    else showScreen('preload');
+    if(state.datasets.length){ renderDatasetsScreen(); /* auto-applied in loader */ }
+    showScreen(state.loaded ? 'modes' : (state.datasets.length ? 'datasets' : 'preload'));
+    updateEnablement();
   });
 }
 init();
