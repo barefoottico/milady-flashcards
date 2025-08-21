@@ -551,7 +551,8 @@ async function addDatasetsFromFiles(files){
 const AUTO_CSVS = []; // e.g., ['mbf_review_questions_exam_1.csv',]
 async function tryAutoLoadMany(){
   if(!AUTO_CSVS.length) return;
-  for(const fname of AUTO_CSVS){
+  const added = [];
+  for (const fname of AUTO_CSVS){
     try{
       const res = await fetch(fname, { cache:'no-store' });
       if(!res.ok) continue;
@@ -559,16 +560,20 @@ async function tryAutoLoadMany(){
       const raw = parseCSV(text);
       const rows = normalizeRows(raw, fname);
       if(!rows.length) continue;
-      const idx = state.datasets.findIndex(d => d.name === fname);
-      const dsObj = { name:fname, rows, count:rows.length };
-      if(idx>=0) state.datasets[idx] = dsObj; else state.datasets.push(dsObj);
+
+      const dsObj = { name: fname, rows, count: rows.length };
+      const i = state.datasets.findIndex(d => d.name === fname);
+      if(i >= 0) state.datasets[i] = dsObj; else state.datasets.push(dsObj);
       state.selected.add(fname);
-    }catch(e){ /* ignore */ }
+      added.push(fname);
+    }catch(_){}
   }
-  if(state.datasets.length){
-    renderDatasetsScreen();
-    showScreen('datasets');
-    updateEnablement();
+  if(added.length){
+    rebuildActiveQuestions();   // combine + shuffle + mark loaded
+    renderDatasetsScreen();     // optional: keeps the manager in sync
+    renderModeSummary();        // show selected sets/counts
+    showScreen('modes');        // jump straight to mode choice
+    updateEnablement();         // enable buttons now that we're loaded
   }
 }
 
