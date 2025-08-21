@@ -548,7 +548,7 @@ async function addDatasetsFromFiles(files){
    Optional: auto-load CSVs hosted alongside index.html
    Fill AUTO_CSVS with filenames, e.g.: const AUTO_CSVS = ['set1.csv','set2.csv'];
    ============ */
-const AUTO_CSVS = []; // e.g., ['FINAL mbf_review_questions_1_50.csv',]
+const AUTO_CSVS = []; // e.g., ['mbf_review_questions_exam_1.csv',]
 async function tryAutoLoadMany(){
   if(!AUTO_CSVS.length) return;
   for(const fname of AUTO_CSVS){
