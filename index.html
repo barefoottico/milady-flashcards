@@ -620,7 +620,6 @@ function renderDatasetsScreen(){
   el.selectedSummary.textContent = `${totalSelected} selected • ${totalCards} cards`;
   updateEnablement();
 }
-}
 function renderModeSummary(){
   const selectedSets = state.datasets.filter(d => state.selected.has(d.name));
   const cards = selectedSets.reduce((a,b)=>a+b.count,0);
