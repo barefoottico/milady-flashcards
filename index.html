@@ -52,6 +52,19 @@
   .muted{color:var(--muted)}
   .cta{display:flex; gap:10px; flex-wrap:wrap; justify-content:center}
 
+/* Welcome modal */
+.modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:1000}
+.modal-backdrop.show{display:flex}
+.modal{background:var(--card); border:1px solid var(--border); border-radius:24px; box-shadow:var(--shadow); max-width:720px; width:min(92vw,720px)}
+.modal .content{padding:20px}
+.w-hero{display:flex; gap:16px; align-items:center}
+.w-logo{width:64px; height:64px; border-radius:12px; border:1px dashed var(--border-strong); background:linear-gradient(180deg,#a9b2c1,#848fa3)}
+.w-logo img{display:block; width:100%; height:100%; object-fit:cover}
+.w-title{margin:0 0 6px 0; font-size:1.25rem}
+.w-desc{margin:0; color:var(--muted)}
+.modal .actions{display:flex; gap:10px; justify-content:flex-end; padding:14px 20px; border-top:1px solid var(--border)}
+button.linklike{background:transparent; border:1px solid var(--border)}
+  
   /* Buttons */
   button{
     appearance:none; border:none; cursor:pointer; font-weight:600;
@@ -183,6 +196,34 @@
     </div>
   </header>
 
+  <!-- Welcome (first visit) -->
+<div id="welcomeBackdrop" class="modal-backdrop" aria-hidden="true">
+  <div id="welcomeDialog" class="modal" role="dialog" aria-modal="true"
+       aria-labelledby="welcomeTitle" aria-describedby="welcomeDesc">
+    <div class="content">
+      <div class="w-hero">
+        <div class="w-logo" aria-hidden="true">
+          <img id="welcomeLogo" alt="Milady Barber Test Prep logo">
+        </div>
+        <div>
+          <h2 id="welcomeTitle" class="w-title">Welcome to Milady Barber Test Prep</h2>
+          <p id="welcomeDesc" class="w-desc">
+            We thank you for visiting the Milady Barber Test Prep. Here you can
+            <b>Open Play</b> interactive flashcards or run a <b>Test</b> on chapter
+            reviews and exams to better prepare for State Board.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="welcomeOpen" class="ghost">Open Play</button>
+      <button id="welcomeTest" class="primary">Start Test</button>
+      <button id="welcomeClose" class="linklike">Not now</button>
+    </div>
+  </div>
+</div>
+
+  
   <main class="wrap">
     <!-- Preload (no upload CTA anymore) -->
     <section id="screenPreload" class="panel center">
@@ -413,6 +454,14 @@ const el = {
   resetBtn: document.getElementById('resetBtn'),
   datasetsBtn: document.getElementById('datasetsBtn'),
 
+  welcomeBackdrop: document.getElementById('welcomeBackdrop'),
+welcomeDialog: document.getElementById('welcomeDialog'),
+welcomeClose: document.getElementById('welcomeClose'),
+welcomeOpenBtn: document.getElementById('welcomeOpen'),
+welcomeTestBtn: document.getElementById('welcomeTest'),
+welcomeLogo: document.getElementById('welcomeLogo'),
+
+
   // Theme
   themeToggle: document.getElementById('themeToggle'),
 
@@ -489,6 +538,10 @@ el.debugBtn.addEventListener('click', () => {
    >>> Set your repo filenames here <<<
    ============ */
 const AUTO_CSVS = ['mbf_exam_1.csv', 'mbf_exam_2.csv'];
+
+  // Optional logo shown in the welcome popup.
+// Put your image in the repo and set this path (e.g., 'logo.png' or 'img/logo.png').
+const LOGO_URL = ''; // set later to 'logo.png'
 
 /* Auto-loader that reports per-file status and applies selection */
 async function tryAutoLoadMany(){
@@ -863,6 +916,51 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+function openWelcome(){
+  if(!el.welcomeBackdrop) return;
+  el.welcomeBackdrop.classList.add('show');
+  document.body.style.overflow = 'hidden';
+  setWelcomeLogo();
+  // focus a safe button
+  setTimeout(()=> el.welcomeClose?.focus(), 0);
+}
+function closeWelcome(){
+  el.welcomeBackdrop?.classList.remove('show');
+  document.body.style.overflow = '';
+  try { localStorage.setItem('mbf_welcome_shown','1'); } catch {}
+}
+function setWelcomeLogo(){
+  if(!el.welcomeLogo) return;
+  if(LOGO_URL){
+    el.welcomeLogo.src = LOGO_URL;
+    el.welcomeLogo.addEventListener('error', ()=>{ el.welcomeLogo.removeAttribute('src'); }, { once:true });
+  }else{
+    el.welcomeLogo.removeAttribute('src'); // keep gray placeholder
+  }
+}
+function showWelcomeIfFirstVisit(){
+  let seen = null; try { seen = localStorage.getItem('mbf_welcome_shown'); } catch {}
+  if(!seen) openWelcome();
+}
+
+// Welcome events
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape' && el.welcomeBackdrop?.classList.contains('show')) closeWelcome();
+});
+el.welcomeBackdrop?.addEventListener('click', (e)=>{
+  if(e.target === el.welcomeBackdrop) closeWelcome(); // click outside to dismiss
+});
+el.welcomeClose?.addEventListener('click', ()=>{ closeWelcome(); showScreen('modes'); });
+el.welcomeOpenBtn?.addEventListener('click', ()=>{
+  closeWelcome();
+  if(state.loaded) switchMode('open'); else showScreen('modes');
+});
+el.welcomeTestBtn?.addEventListener('click', ()=>{
+  closeWelcome();
+  if(state.loaded) switchMode('test'); else showScreen('modes');
+});
+
+  
 /* ============
    Init
    ============ */
@@ -872,6 +970,7 @@ function init(){
     if(state.datasets.length){ renderDatasetsScreen(); }
     showScreen(state.loaded ? 'modes' : (state.datasets.length ? 'datasets' : 'preload'));
     updateEnablement();
+   showWelcomeIfFirstVisit(); // <-- add this line
   });
 }
 init();
