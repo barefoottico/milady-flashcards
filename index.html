@@ -248,19 +248,25 @@ button.linklike{background:transparent; border:1px solid var(--border)}
     </section>
 
     <!-- Mode selection -->
-    <section id="screenModes" class="panel center hidden" aria-live="polite">
-      <div>
-        <h2>Choose a mode</h2>
-        <p class="muted">
-          <span id="modeSummary">Sets: 0 selected • 0 cards</span>
-          &nbsp;—&nbsp;<button id="quickManageBtn" class="ghost">Manage Sets</button>
-        </p>
-        <div class="cta" role="group" aria-label="Choose mode">
-          <button id="startOpen" class="primary">Open Play</button>
-          <button id="startTest" class="">Test Mode</button>
-        </div>
-      </div>
-    </section>
+  <section id="screenModes" class="panel center hidden" aria-live="polite">
+  <div>
+    <h2>Study smarter, not longer</h2>
+
+    <p id="modeBody" class="body">
+      Tap <b>Open Play</b> for quick reps. Tap <b>Test Mode</b> for a timed, chapter-based check.
+    </p>
+
+    <div class="cta" role="group" aria-label="Choose mode">
+      <button id="startOpen" class="primary">Open Play</button>
+      <button id="startTest">Start Test</button>
+    </div>
+
+    <p class="muted microcopy">
+      Pick chapters via <button id="quickManageBtn" class="linklike">Manage Sets</button>.
+    </p>
+  </div>
+</section>
+
 
     <!-- Open Play screen -->
     <section id="screenOpen" class="panel hidden" aria-live="polite">
