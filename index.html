@@ -576,13 +576,16 @@ function renderDatasetsScreen(){
     el.applySetsBtn.disabled = true;
     return;
   }
+
   let totalSelected = 0;
   let totalCards = 0;
+
   state.datasets.forEach(ds => {
     const checked = state.selected.has(ds.name);
     if(checked){ totalSelected++; totalCards += ds.count; }
 
-    const item = document.createElement('div');
+    // Row container (label makes whole row clickable)
+    const item = document.createElement('label');
     item.className = 'ds-item';
 
     const left = document.createElement('div');
@@ -593,7 +596,8 @@ function renderDatasetsScreen(){
     cb.checked = checked;
     cb.setAttribute('aria-label', `Select dataset ${ds.name}`);
     cb.addEventListener('change', () => {
-      if(cb.checked) state.selected.add(ds.name); else state.selected.delete(ds.name);
+      if(cb.checked) state.selected.add(ds.name);
+      else state.selected.delete(ds.name);
       renderDatasetsScreen();
     });
 
@@ -609,24 +613,13 @@ function renderDatasetsScreen(){
     left.appendChild(name);
     left.appendChild(count);
 
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'ghost';
-    removeBtn.title = 'Remove from memory';
-    removeBtn.innerHTML = 'Remove';
-    removeBtn.addEventListener('click', () => {
-      state.datasets = state.datasets.filter(d => d.name !== ds.name);
-      state.selected.delete(ds.name);
-      renderDatasetsScreen();
-      updateEnablement();
-    });
-
     item.appendChild(left);
-    item.appendChild(removeBtn);
     el.dsList.appendChild(item);
   });
 
   el.selectedSummary.textContent = `${totalSelected} selected • ${totalCards} cards`;
   updateEnablement();
+}
 }
 function renderModeSummary(){
   const selectedSets = state.datasets.filter(d => state.selected.has(d.name));
