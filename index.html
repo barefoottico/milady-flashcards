@@ -490,32 +490,60 @@ el.debugBtn.addEventListener('click', () => {
    ============ */
 const AUTO_CSVS = ['mbf_exam_1.csv', 'mbf_exam_2.csv'];
 
-/* Auto-loader that also applies selection and jumps to mode chooser */
+/* Auto-loader that reports per-file status and applies selection */
 async function tryAutoLoadMany(){
+  const statuses = []; // [["file","OK (N rows)"] or ["file","HTTP 404"], ...]
   if(!AUTO_CSVS.length) return;
-  const added = [];
+
   for (const fname of AUTO_CSVS){
     try{
       const res = await fetch(fname, { cache:'no-store' });
-      if(!res.ok) continue;
+      if(!res.ok){ statuses.push([fname, `HTTP ${res.status}`]); continue; }
+
       const text = await res.text();
       const raw = parseCSV(text);
-      const rows = normalizeRows(raw, fname);
-      if(!rows.length) continue;
+      if(!raw.length){ statuses.push([fname, 'Empty CSV']); continue; }
+
+      let rows;
+      try {
+        rows = normalizeRows(raw, fname);   // validates required columns
+      } catch (e) {
+        statuses.push([fname, `Schema error: ${e.message}`]);
+        continue;
+      }
+      if(!rows.length){ statuses.push([fname, 'No valid rows']); continue; }
 
       const dsObj = { name: fname, rows, count: rows.length };
       const i = state.datasets.findIndex(d => d.name === fname);
       if(i >= 0) state.datasets[i] = dsObj; else state.datasets.push(dsObj);
       state.selected.add(fname);
-      added.push(fname);
-    }catch(_){ /* ignore missing or blocked */ }
+      statuses.push([fname, `OK (${rows.length} rows)`]);
+
+    }catch(err){
+      statuses.push([fname, `Load error: ${err.message}`]);
+    }
   }
-  if(added.length){
-    rebuildActiveQuestions();   // combine + shuffle + mark loaded
-    renderDatasetsScreen();     // keep manager in sync
-    renderModeSummary();        // show selected sets/counts
-    showScreen('modes');        // go straight to mode choice
-    updateEnablement();         // enable buttons now that we're loaded
+
+  // Console summary for devs
+  if (statuses.length) {
+    try { console.table(statuses.map(([file,status]) => ({ file, status }))); } catch(_) {}
+  }
+
+  // Show a short status summary in the datasets UI (if present)
+  const ok = statuses.filter(s => s[1].startsWith('OK')).length;
+  const bad = statuses.length - ok;
+  if (document.getElementById('dsHint')) {
+    const bullets = statuses.map(([f,s]) => `${f}: ${s}`).join(' • ');
+    document.getElementById('dsHint').textContent =
+      (statuses.length ? `Auto-load: ${bullets}` : 'Select the sets you want to include.');
+  }
+
+  if(ok){
+    rebuildActiveQuestions();
+    renderDatasetsScreen();
+    renderModeSummary();
+    showScreen('modes');
+    updateEnablement();
   }
 }
 
