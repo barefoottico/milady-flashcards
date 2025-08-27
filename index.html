@@ -1,992 +1,676 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<!doctype html>
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Milady Barber Flashcards — Multi-CSV (Auto-load)</title>
-<style>
-  /* THEME TOKENS — dark defaults; light overrides below via [data-theme="light"] */
-  :root{
-    --bgGradStart:#0e1116; --bgGradEnd:#0b0e13;
-    --card:#161a22; --soft:#1f2530; --ink:#e9edf5; --muted:#b6c0d4;
-    --accent:#6ea8ff; --good:#34d399; --bad:#f87171; --focus:#93c5fd; --warn:#fbbf24;
-    --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.12); --badgeBg:rgba(255,255,255,.12);
-    --headerBg:rgba(15,17,21,.6);
-    --btnBg:#e9edf5; --btnFg:#0c111a; /* default button */
-    --shadow:0 10px 30px rgba(0,0,0,.30);
-    --radius:18px;
-  }
-  html[data-theme="light"]{
-    --bgGradStart:#f6f8fb; --bgGradEnd:#eef2f7;
-    --card:#ffffff; --soft:#f3f6fb; --ink:#0f172a; --muted:#475569;
-    --accent:#2563eb; --good:#059669; --bad:#dc2626; --focus:#2563eb; --warn:#d97706;
-    --border:rgba(15,23,42,.10); --border-strong:rgba(15,23,42,.14); --badgeBg:rgba(15,23,42,.08);
-    --headerBg:rgba(255,255,255,.75);
-    --btnBg:#0f172a; --btnFg:#f8fafc;
-    --shadow:0 10px 24px rgba(2,6,23,.10);
-  }
-
-  *{box-sizing:border-box}
-  html,body{margin:0;height:100%}
-  body{
-    background:linear-gradient(180deg,var(--bgGradStart) 0%,var(--bgGradEnd) 100%);
-    color:var(--ink);
-    font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
-  }
-  header{
-    position:sticky; top:0; z-index:10; backdrop-filter:saturate(1.2) blur(8px);
-    background:var(--headerBg); border-bottom:1px solid var(--border);
-  }
-  .wrap{max-width:980px; margin:0 auto; padding:16px 20px}
-  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
-  h1{font-size:1.25rem; margin:0; letter-spacing:.2px}
-  .pill{
-    background:var(--soft); border:1px solid var(--border);
-    padding:8px 12px; border-radius:999px; color:var(--muted); font-size:.9rem;
-  }
-  main .panel{
-    background:var(--card); border:1px solid var(--border);
-    border-radius:var(--radius); box-shadow:var(--shadow); padding:20px;
-  }
-  .center{display:grid; place-items:center; min-height:58vh; text-align:center}
-  .muted{color:var(--muted)}
-  .cta{display:flex; gap:10px; flex-wrap:wrap; justify-content:center}
-
-/* Welcome modal */
-.modal-backdrop{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; z-index:1000}
-.modal-backdrop.show{display:flex}
-.modal{background:var(--card); border:1px solid var(--border); border-radius:24px; box-shadow:var(--shadow); max-width:720px; width:min(92vw,720px)}
-.modal .content{padding:20px}
-.w-hero{display:flex; gap:16px; align-items:center}
-.w-logo{width:64px; height:64px; border-radius:12px; border:1px dashed var(--border-strong); background:linear-gradient(180deg,#a9b2c1,#848fa3)}
-.w-logo img{display:block; width:100%; height:100%; object-fit:cover}
-.w-title{margin:0 0 6px 0; font-size:1.25rem}
-.w-desc{margin:0; color:var(--muted)}
-.modal .actions{display:flex; gap:10px; justify-content:flex-end; padding:14px 20px; border-top:1px solid var(--border)}
-button.linklike{background:transparent; border:1px solid var(--border)}
-  
-  /* Buttons */
-  button{
-    appearance:none; border:none; cursor:pointer; font-weight:600;
-    background:var(--btnBg); color:var(--btnFg);
-    padding:12px 16px; border-radius:12px;
-    transition:transform .04s ease, box-shadow .2s ease, opacity .2s ease;
-  }
-  button:hover{transform:translateY(-1px)}
-  button:active{transform:translateY(0)}
-  button.ghost{
-    background:transparent; color:var(--ink); border:1px solid var(--border);
-  }
-  button.primary{background:var(--accent); color:#00122b}
-  html[data-theme="light"] button.primary{color:#eff6ff}
-  button.good{background:var(--good); color:#07160f}
-  button.bad{background:var(--bad); color:#210707}
-  button.warn{background:var(--warn); color:#1e1606}
-  button[disabled]{opacity:.6; cursor:not-allowed}
-  button:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
-
-  /* Layout sections */
-  .toolbar{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
-  .spacer{flex:1}
-  .mode-toggle{display:flex; gap:8px; background:var(--soft); padding:6px; border-radius:14px; border:1px solid var(--border)}
-  .mode-toggle button{
-    background:transparent; color:var(--muted); padding:8px 12px; border-radius:10px;
-    border:1px solid transparent;
-  }
-  .mode-toggle button[aria-pressed="true"]{
-    background:var(--accent); color:#00122b; border-color:transparent;
-  }
-  html[data-theme="light"] .mode-toggle button[aria-pressed="true"]{ color:#eff6ff }
-
-  /* Card */
-  .card{
-    display:grid; gap:12px; background:var(--card);
-    border:1px solid var(--border); border-radius:var(--radius); padding:18px;
-  }
-  .meta{display:flex; gap:10px; flex-wrap:wrap; align-items:center; color:var(--muted); font-size:.9rem}
-  .qid{background:var(--badgeBg); border:1px solid var(--border-strong); padding:4px 8px; border-radius:999px; color:var(--ink)}
-  .src{color:var(--muted)}
-  .question{font-size:1.15rem}
-  .options{display:grid; gap:10px}
-  .opt{
-    display:flex; gap:12px; align-items:center; width:100%;
-    background:var(--soft); color:var(--ink); border:1px solid var(--border);
-    border-radius:12px; padding:14px; text-align:left;
-  }
-  .opt .badge{
-    width:28px; height:28px; border-radius:8px; display:grid; place-items:center;
-    background:var(--badgeBg); color:var(--ink); font-weight:700; flex:0 0 28px;
-    border:1px solid var(--border);
-  }
-  .opt[disabled]{opacity:.6; cursor:not-allowed}
-  .opt.correct{outline:2px solid var(--good); background:color-mix(in oklab, var(--good) 12%, transparent)}
-  .controls{display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:6px}
-  .progress{color:var(--muted); font-size:.95rem}
-
-  /* Results */
-  .results h2{margin:.2rem 0 1rem 0}
-  .score{
-    display:flex; gap:12px; align-items:center; background:var(--soft);
-    border:1px solid var(--border); border-radius:14px; padding:14px;
-  }
-  .missed{margin-top:16px; display:grid; gap:14px}
-  .missed .miss{
-    background:var(--soft); border:1px solid var(--border);
-    border-radius:14px; padding:14px;
-  }
-  .miss .q{margin:.1rem 0 .5rem 0}
-  .pair{display:flex; gap:10px; flex-wrap:wrap}
-  .pair .tag{font-weight:700}
-  .pair .ans{color:var(--ink)}
-
-  /* Dataset picker */
-  .ds-list{display:grid; gap:10px}
-  .ds-item{
-    display:flex; gap:12px; align-items:center; justify-content:space-between;
-    padding:12px; background:var(--soft); border:1px solid var(--border); border-radius:12px;
-  }
-  .ds-left{display:flex; align-items:center; gap:12px}
-  .ds-name{font-weight:700}
-  .ds-count{color:var(--muted); font-size:.9rem}
-  .chip{background:var(--badgeBg); border:1px solid var(--border-strong); padding:4px 8px; border-radius:999px; color:var(--ink)}
-  .danger{color:var(--bad)}
-
-  /* Debug */
-  .debug-toggle{margin-left:auto}
-  #debugPanel{display:none; margin-top:10px; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:.9rem}
-  #debugPanel pre{
-    background:color-mix(in oklab, var(--soft) 70%, black 0%); color:var(--muted);
-    border:1px solid var(--border); border-radius:12px; padding:12px; overflow:auto;
-  }
-  .show{display:block !important}
-  .hidden{display:none !important}
-
-  @media (min-width:720px){
-    .question{font-size:1.25rem}
-  }
-   /* Hide debug UI */
-    #debugBtn, #debugPanel { display: none !important; }
-
-  /* Mode screen copy polish */
-#modeSummary { display: none !important; } /* hide old summary if still present */
-#screenModes .body { margin: .4rem 0 .8rem; }
-#screenModes .microcopy { margin-top: .6rem; }
-button.linklike { background: transparent; border: 1px solid var(--border); padding: 6px 10px; border-radius: 10px; }
-
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Milady Barber Test Prep</title>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <header>
-    <div class="wrap">
-      <div class="row">
-        <h1>Milady Barber Flashcards</h1>
-        <!-- (blurb removed) -->
-        <div class="spacer"></div>
+<body class="bg-zinc-50 text-zinc-900">
+  <main class="max-w-xl mx-auto px-6 py-12">
+    <header class="mb-6">
+      <h1 class="text-2xl font-bold">Study smarter, not longer</h1>
+      <p class="text-zinc-600 mt-2">
+        Tap <strong>Open Play</strong> for quick reps. Tap <strong>Test Mode</strong> for a chapter-based check.
+      </p>
+    </header>
 
-        <!-- Theme toggle -->
-        <button id="themeToggle" class="ghost" aria-pressed="false" title="Toggle color theme">☀️ Light</button>
-
-        <!-- (Upload controls removed) -->
-
-        <!-- Datasets manager -->
-        <button id="datasetsBtn" class="ghost" disabled title="Manage selected datasets">Manage Sets</button>
-
-        <!-- Mode toggle -->
-        <div class="mode-toggle" role="tablist" aria-label="Mode">
-          <button id="modeOpen" role="tab" aria-pressed="false" disabled>Open Play</button>
-          <button id="modeTest" role="tab" aria-pressed="false" disabled>Test Mode</button>
-        </div>
-
-        <button id="resetBtn" class="ghost" disabled title="Reset to mode selection">Reset</button>
-        <button id="debugBtn" class="ghost debug-toggle" title="Toggle debug">🐞 Debug</button>
-      </div>
-    </div>
-  </header>
-
-  <!-- Welcome (first visit) -->
-<div id="welcomeBackdrop" class="modal-backdrop" aria-hidden="true">
-  <div id="welcomeDialog" class="modal" role="dialog" aria-modal="true"
-       aria-labelledby="welcomeTitle" aria-describedby="welcomeDesc">
-    <div class="content">
-      <div class="w-hero">
-        <div class="w-logo" aria-hidden="true">
-          <img id="welcomeLogo" alt="Milady Barber Test Prep logo">
-        </div>
-        <div>
-          <h2 id="welcomeTitle" class="w-title">Welcome to Milady Barber Test Prep</h2>
-          <p id="welcomeDesc" class="w-desc">
-            We thank you for visiting the Milady Barber Test Prep. Here you can
-            <b>Open Play</b> interactive flashcards or run a <b>Test</b> on chapter
-            reviews and exams to better prepare for State Board.
-          </p>
-        </div>
-      </div>
-    </div>
-    <div class="actions">
-      <button id="welcomeOpen" class="ghost">Open Play</button>
-      <button id="welcomeTest" class="primary">Start Test</button>
-      <button id="welcomeClose" class="linklike">Not now</button>
-    </div>
-  </div>
-</div>
-
-  
-  <main class="wrap">
-    <!-- Preload (no upload CTA anymore) -->
-    <section id="screenPreload" class="panel center">
-      <div>
-        <h2>Loading datasets…</h2>
-        <p class="muted">This page auto-loads study sets hosted with it.</p>
-      </div>
+    <!-- Landing CTA: shown on first load only -->
+    <section id="cta" class="flex gap-3">
+      <button id="openPlayBtn" class="px-4 py-2 rounded-xl shadow bg-white border border-zinc-200 hover:bg-zinc-100">Open Play</button>
+      <button id="testModeBtn" class="px-4 py-2 rounded-xl shadow bg-black text-white hover:opacity-90">Start Test</button>
     </section>
 
-    <!-- Dataset selection screen -->
-    <section id="screenDatasets" class="panel hidden" aria-live="polite">
-      <h2 style="margin-top:0">Choose datasets</h2>
-      <p class="muted" id="dsHint">Select the sets you want to include. Mixed runs combine and shuffle all selected cards.</p>
-      <div id="dsList" class="ds-list" role="group" aria-label="Datasets"></div>
-      <div class="controls" style="margin-top:10px">
-        <button id="selectAllBtn" class="ghost">Select all</button>
-        <button id="selectNoneBtn" class="ghost">Select none</button>
-        <span class="chip" id="selectedSummary">0 selected • 0 cards</span>
-        <span class="spacer"></span>
-        <button id="applySetsBtn" class="primary" disabled>Apply & Continue</button>
+    <!-- Test config (hidden until Test Mode) -->
+    <section id="testConfig" class="mt-4 hidden">
+      <label for="tmCountRange" class="block text-sm text-zinc-600 mb-1">Questions per test</label>
+      <div class="flex items-center gap-3">
+        <input id="tmCountRange" type="range" min="0" max="3" step="1" value="0" class="w-full" />
+        <span id="tmCountLabel" class="text-sm font-medium w-12 text-right">20</span>
+        <button id="tmApplyCount" class="px-3 py-1.5 rounded-lg border text-sm">Apply</button>
       </div>
+      <p class="text-xs text-zinc-500 mt-1">
+        20 • 50 • 100 • 150 — press <kbd>Enter</kbd> on the slider or click Apply.
+        <span class="text-amber-700">Changing the number will restart any in-progress test.</span>
+      </p>
     </section>
 
-    <!-- Mode selection -->
-  <section id="screenModes" class="panel center hidden" aria-live="polite">
-  <div>
-    <h2>Study smarter, not longer</h2>
-
-    <p id="modeBody" class="body">
-      Tap <b>Open Play</b> for quick reps. Tap <b>Test Mode</b> for a timed, chapter-based check.
-    </p>
-
-    <div class="cta" role="group" aria-label="Choose mode">
-      <button id="startOpen" class="primary">Open Play</button>
-      <button id="startTest">Start Test</button>
-    </div>
-
-    <p class="muted microcopy">
-      Pick chapters via <button id="quickManageBtn" class="linklike">Manage Sets</button>.
-    </p>
-  </div>
+    <!-- Loading / error (hidden until a mode is chosen) -->
+  <section id="loadWrap" class="mt-8">
+  <div id="status" class="text-sm text-zinc-700">Loading datasets…</div>
+  <div id="error" class="hidden text-sm text-red-600 mt-2"></div>
 </section>
 
-
-    <!-- Open Play screen -->
-    <section id="screenOpen" class="panel hidden" aria-live="polite">
-      <div class="card" aria-labelledby="qTextOpen">
-        <div class="meta">
-          <span class="qid" id="metaOpenId">ID —</span>
-          <span class="src" id="metaOpenSource"></span>
-          <span class="chip" id="metaOpenSet"></span>
+    <!-- Filter bar (hidden until a mode is chosen) -->
+    <section id="app" class="mt-4 hidden">
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-sm text-zinc-500">Filter:</span>
+          <div id="setPills" class="flex flex-wrap gap-2"></div>
         </div>
-        <div id="qTextOpen" class="question"></div>
-        <div id="optsOpen" class="options" role="group" aria-label="Options (view only)"></div>
-        <div class="controls">
-          <button id="flipBtn" class="ghost" aria-pressed="false">Flip</button>
-          <button id="nextBtn" class="">Next</button>
-          <span id="openProgress" class="progress"></span>
-        </div>
+        <div id="statusSummary" class="text-sm text-zinc-700 whitespace-nowrap"></div>
       </div>
     </section>
 
-    <!-- Test Mode screen -->
-    <section id="screenTest" class="panel hidden" aria-live="polite">
-      <div class="card" aria-labelledby="qTextTest">
-        <div class="meta">
-          <span class="qid" id="metaTestId">ID —</span>
-          <span class="src" id="metaTestSource"></span>
-          <span class="chip" id="metaTestSet"></span>
-          <span class="spacer"></span>
-          <span id="testProgress" class="progress"></span>
+    <!-- OPEN PLAY VIEW -->
+    <section id="openPlayView" class="hidden max-w-xl mx-auto mt-8">
+      <div class="flex items-center justify-between mb-3">
+        <div id="opProgress" class="text-sm text-neutral-600">0 / 0</div>
+        <div class="flex items-center gap-2">
+          <button id="opShuffleBtn" class="px-3 py-1.5 rounded-lg border text-sm">Shuffle: Off</button>
+          <button id="opStarFilterBtn" class="px-3 py-1.5 rounded-lg border text-sm">Starred: All</button>
         </div>
-        <div id="qTextTest" class="question"></div>
-        <div id="optsTest" class="options" role="group" aria-label="Options (choose one)"></div>
       </div>
+
+      <div id="opCard"
+           class="relative rounded-2xl border bg-white shadow p-6 min-h-[220px] cursor-pointer select-none"
+           tabindex="0" aria-live="polite">
+        <div id="opFront" class="block">
+          <div id="opQuestion" class="text-lg font-semibold mb-4">Question will appear here</div>
+          <ul id="opOptions" class="space-y-2 text-base"></ul>
+        </div>
+        <div id="opBack" class="hidden">
+          <div class="text-xs uppercase tracking-wide text-neutral-500 mb-2">Answer</div>
+          <div id="opAnswer" class="text-lg font-semibold"></div>
+          <div id="opAnswerExplain" class="text-sm text-neutral-600 mt-2"></div>
+        </div>
+
+        <button id="opStarBtn" title="Star this card"
+                class="absolute top-3 right-3 text-xl leading-none">☆</button>
+      </div>
+
+      <div class="mt-5 flex items-center justify-between">
+        <button id="opPrevBtn" class="px-4 py-2 rounded-xl border">◀ Prev</button>
+        <button id="opFlipBtn" class="px-4 py-2 rounded-xl border">Flip</button>
+        <button id="opNextBtn" class="px-4 py-2 rounded-xl border">Next ▶</button>
+      </div>
+
+      <p class="mt-3 text-xs text-neutral-500">Tip: Tap card to flip · ←/→ to navigate · Space/Enter to flip</p>
     </section>
 
-    <!-- Results screen -->
-    <section id="screenResults" class="panel hidden results" aria-live="polite">
-      <h2>Results</h2>
-      <div id="scoreBox" class="score"></div>
-      <div class="controls" style="margin-top:14px">
-        <button id="retakeBtn" class="primary">Retake Test (reshuffle)</button>
-        <button id="backToModesBtn" class="ghost">Back to Modes</button>
+    <!-- TEST MODE VIEW -->
+    <section id="testView" class="hidden max-w-xl mx-auto mt-8">
+      <div class="flex items-center justify-between mb-3">
+        <div id="tmProgress" class="text-sm text-neutral-600">Q 1 / 20</div>
+        <button id="tmSubmitBtn" class="px-3 py-1.5 rounded-lg border text-sm bg-black text-white">Submit</button>
       </div>
-      <div id="missedWrap" class="missed"></div>
-    </section>
 
-    <!-- Debug -->
-    <section id="debugPanel" class="panel">
-      <h3 style="margin-top:0">Debug</h3>
-      <pre id="debugPre">{}</pre>
+      <div id="tmCard" class="rounded-2xl border bg-white shadow p-6 min-h-[220px]">
+        <div id="tmQuestion" class="text-lg font-semibold mb-4">Question</div>
+        <div id="tmOptions" class="space-y-2"></div>
+        <div class="mt-3 flex items-center justify-between">
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input id="tmFlag" type="checkbox" class="rounded" />
+            Flag for review
+          </label>
+          <div class="flex items-center gap-2">
+            <button id="tmPrev" class="px-3 py-1.5 rounded-lg border text-sm">◀ Prev</button>
+            <button id="tmNext" class="px-3 py-1.5 rounded-lg border text-sm">Next ▶</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div id="tmResults" class="hidden mt-6">
+        <div id="tmScore" class="text-lg font-semibold mb-2"></div>
+        <div id="tmBreakdown" class="text-sm text-neutral-700 mb-4"></div>
+        <details class="rounded-xl border bg-white p-4">
+          <summary class="cursor-pointer font-medium">Review answers</summary>
+          <div id="tmReview" class="mt-3 space-y-4"></div>
+        </details>
+        <div class="mt-4 flex items-center gap-2">
+          <button id="tmRestart" class="px-4 py-2 rounded-xl border">Retake</button>
+          <button id="tmBackToOpen" class="px-4 py-2 rounded-xl border">Back to Open Play</button>
+        </div>
+      </div>
     </section>
   </main>
 
-<script>
-/* ============
-   Minimal CSV Parser (handles quotes, commas, CRLF)
-   ============ */
-function parseCSV(text){
-  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // strip BOM
-  let i=0, inQuotes=false, field='', row=[], rows=[];
-  const pushField=()=>{ row.push(field); field=''; };
-  const pushRow=()=>{ rows.push(row); row=[]; };
-  while(i < text.length){
-    const c = text[i];
-    if(inQuotes){
-      if(c === '"'){ if(text[i+1] === '"'){ field += '"'; i++; } else inQuotes = false; }
-      else field += c;
-    }else{
-      if(c === '"') inQuotes = true;
-      else if(c === ',') pushField();
-      else if(c === '\n'){ pushField(); pushRow(); }
-      else if(c === '\r'){ /* ignore */ }
-      else field += c;
-    }
-    i++;
-  }
-  pushField(); pushRow();
-  while(rows.length && rows[rows.length-1].every(x => x === '')) rows.pop();
-
-  if(rows.length === 0) return [];
-  const header = rows.shift().map(h => h.trim());
-  return rows.map(r => {
-    const o = {};
-    header.forEach((h, idx) => { o[h] = (r[idx] ?? '').trim(); });
-    return o;
-  });
-}
-
-/* ============
-   App State (datasets + modes)
-   ============ */
-const state = {
-  loaded:false,
-  datasets:[],          // [{ name, rows:[normalized], count }]
-  selected:new Set(),   // names of datasets selected
-  mode:null,            // 'open' | 'test' | null
-  questions:[],         // combined rows from selected datasets
-  order:[],             // shuffled order
-  current:0,
-  flipped:false,
-  answers:new Map(),
-  autoAdvanceMs:350
-};
-
-function resetRunKeepData(){
-  state.order = Array.from({length: state.questions.length}, (_,i)=>i);
-  shuffle(state.order);
-  state.current = 0;
-  state.flipped = false;
-  state.answers.clear();
-}
-function shuffle(arr){
-  for(let i=arr.length-1;i>0;i--){
-    const j = Math.floor(Math.random()*(i+1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-/* ============
-   Data Normalization & Validation
-   ============ */
-const REQUIRED_COLS = ["id","type","question","option_a","option_b","option_c","option_d","option_e","correct_options","source","topic"];
-function normalizeRows(rawRows, datasetName){
-  const missing = REQUIRED_COLS.filter(k => !(k in (rawRows[0]||{})));
-  if(missing.length){ throw new Error("Missing columns: " + missing.join(", ")); }
-  const mapped = rawRows.map(r => {
-    const options = [];
-    const pushOpt = (letter, text) => { const t=(text||"").trim(); if(t) options.push({letter, text:t}); };
-    pushOpt('A', r.option_a); pushOpt('B', r.option_b); pushOpt('C', r.option_c);
-    pushOpt('D', r.option_d); pushOpt('E', r.option_e);
-    const corrLetters = (r.correct_options||"").toUpperCase().replace(/[^A-E]/g,'').split('')
-      .filter((v,i,a)=>a.indexOf(v)===i);
-    return {
-      id:(r.id||"").trim(),
-      type:(r.type||"").trim(),
-      question:(r.question||"").trim(),
-      options,
-      correctLetters:corrLetters.length?corrLetters:[],
-      correctPrimary: corrLetters.find(l => options.some(o=>o.letter===l)) || null,
-      source:(r.source||"").trim(),
-      topic:(r.topic||"").trim(),
-      dataset:datasetName
+  <script>
+    /* =======================
+       1) DATA LOADING + NAMES
+    ======================= */
+    const DATASETS = [
+      { id: "exam1", short: "Exam 1", label: "MBF Exam 1", path: "./mbf_exam_1.csv" },
+      { id: "exam2", short: "Exam 2", label: "MBF Exam 2", path: "./mbf_exam_2.csv" },
+    ];
+    const RAW_FALLBACK = {
+      exam1: "https://raw.githubusercontent.com/barefoottico/milady-flashcards/main/mbf_exam_1.csv",
+      exam2: "https://raw.githubusercontent.com/barefoottico/milady-flashcards/main/mbf_exam_2.csv",
     };
-  }).filter(o => o.id && o.question);
-  return mapped;
-}
-function validateRow(row){
-  if(!row) return "That question is not in the provided list.";
-  if(!row.id || !row.question) return "That question is not in the provided list.";
-  if(!row.options.length) return "That question is not in the provided list.";
-  if(!row.correctPrimary) return "That question is not in the provided list.";
-  return null;
-}
 
-/* ============
-   Combine selected datasets -> active questions
-   ============ */
-function rebuildActiveQuestions(){
-  const selectedSets = state.datasets.filter(d => state.selected.has(d.name));
-  state.questions = selectedSets.flatMap(d => d.rows);
-  state.loaded = state.questions.length > 0;
-  if(state.loaded) resetRunKeepData();
-  updateEnablement();
-}
+    const state = { cards: [], mode: null };
 
-/* ============
-   DOM Refs
-   ============ */
-const el = {
-  screenPreload: document.getElementById('screenPreload'),
-  screenDatasets: document.getElementById('screenDatasets'),
-  dsList: document.getElementById('dsList'),
-  dsHint: document.getElementById('dsHint'),
-  selectAllBtn: document.getElementById('selectAllBtn'),
-  selectNoneBtn: document.getElementById('selectNoneBtn'),
-  selectedSummary: document.getElementById('selectedSummary'),
-  applySetsBtn: document.getElementById('applySetsBtn'),
+    // DOM refs
+    const $loadWrap        = document.getElementById("loadWrap");
+    const $status          = document.getElementById("status");
+    const $error           = document.getElementById("error");
+    const $app             = document.getElementById("app");
+    const $setPills        = document.getElementById("setPills");
+    const $statusSummary   = document.getElementById("statusSummary");
 
-  screenModes: document.getElementById('screenModes'),
-  modeSummary: document.getElementById('modeSummary'),
-  quickManageBtn: document.getElementById('quickManageBtn'),
+    const $openPlayView    = document.getElementById("openPlayView");
+    const $opCard          = document.getElementById("opCard");
+    const $opFront         = document.getElementById("opFront");
+    const $opBack          = document.getElementById("opBack");
+    const $opQuestion      = document.getElementById("opQuestion");
+    const $opOptions       = document.getElementById("opOptions");
+    const $opAnswer        = document.getElementById("opAnswer");
+    const $opAnswerExplain = document.getElementById("opAnswerExplain");
+    const $opProgress      = document.getElementById("opProgress");
+    const $opShuffleBtn    = document.getElementById("opShuffleBtn");
+    const $opStarFilterBtn = document.getElementById("opStarFilterBtn");
+    const $opStarBtn       = document.getElementById("opStarBtn");
+    const $opPrevBtn       = document.getElementById("opPrevBtn");
+    const $opNextBtn       = document.getElementById("opNextBtn");
+    const $opFlipBtn       = document.getElementById("opFlipBtn");
 
-  screenOpen: document.getElementById('screenOpen'),
-  screenTest: document.getElementById('screenTest'),
-  screenResults: document.getElementById('screenResults'),
+    // Manage Sets state
+    let loadedSets = [];
+    const selectedSetIds = new Set();
 
-  modeOpen: document.getElementById('modeOpen'),
-  modeTest: document.getElementById('modeTest'),
-  startOpen: document.getElementById('startOpen'),
-  startTest: document.getElementById('startTest'),
-  resetBtn: document.getElementById('resetBtn'),
-  datasetsBtn: document.getElementById('datasetsBtn'),
+    // CSV/TSV parser (supports correct_options)
+    const csvSafeSplit = (line) => line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/g);
+    function parseCSV(text) {
+      text = text.replace(/\r/g, "");
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const firstNewline = text.indexOf("\n");
+      const headerLine = firstNewline === -1 ? text : text.slice(0, firstNewline);
+      const isTSV = headerLine.includes("\t");
 
-  welcomeBackdrop: document.getElementById('welcomeBackdrop'),
-welcomeDialog: document.getElementById('welcomeDialog'),
-welcomeClose: document.getElementById('welcomeClose'),
-welcomeOpenBtn: document.getElementById('welcomeOpen'),
-welcomeTestBtn: document.getElementById('welcomeTest'),
-welcomeLogo: document.getElementById('welcomeLogo'),
+      const rows = text.split("\n").filter(Boolean).map(line => {
+        const cells = isTSV ? line.split("\t") : csvSafeSplit(line);
+        return cells.map(s => s.replace(/^"(.*)"$/, "$1"));
+      });
 
+      const [rawHeader, ...lines] = rows;
+      if (!rawHeader) return [];
+      const header = rawHeader.map(h => (h || "").trim().toLowerCase());
 
-  // Theme
-  themeToggle: document.getElementById('themeToggle'),
+      const findCol = (...names) => { for (const n of names) { const i = header.indexOf(n); if (i !== -1) return i; } return -1; };
+      const idxId  = findCol("id");
+      const idxQ   = findCol("question", "q", "prompt", "stem");
+      const idxA   = findCol("option_a", "a", "opt_a", "choice_a");
+      const idxB   = findCol("option_b", "b", "opt_b", "choice_b");
+      const idxC   = findCol("option_c", "c", "opt_c", "choice_c");
+      const idxD   = findCol("option_d", "d", "opt_d", "choice_d");
+      const idxAns = findCol("correct_options", "answer", "correct", "key", "ans");
 
-  // Open Play
-  qTextOpen: document.getElementById('qTextOpen'),
-  optsOpen: document.getElementById('optsOpen'),
-  metaOpenId: document.getElementById('metaOpenId'),
-  metaOpenSource: document.getElementById('metaOpenSource'),
-  metaOpenSet: document.getElementById('metaOpenSet'),
-  flipBtn: document.getElementById('flipBtn'),
-  nextBtn: document.getElementById('nextBtn'),
-  openProgress: document.getElementById('openProgress'),
-
-  // Test Mode
-  qTextTest: document.getElementById('qTextTest'),
-  optsTest: document.getElementById('optsTest'),
-  metaTestId: document.getElementById('metaTestId'),
-  metaTestSource: document.getElementById('metaTestSource'),
-  metaTestSet: document.getElementById('metaTestSet'),
-  testProgress: document.getElementById('testProgress'),
-
-  // Results
-  scoreBox: document.getElementById('scoreBox'),
-  missedWrap: document.getElementById('missedWrap'),
-  retakeBtn: document.getElementById('retakeBtn'),
-  backToModesBtn: document.getElementById('backToModesBtn'),
-
-  // Debug
-  debugBtn: document.getElementById('debugBtn'),
-  debugPanel: document.getElementById('debugPanel'),
-  debugPre: document.getElementById('debugPre')
-};
-
-/* ============
-   Event Wiring
-   ============ */
-el.datasetsBtn.addEventListener('click', () => { renderDatasetsScreen(); showScreen('datasets'); });
-el.quickManageBtn.addEventListener('click', () => { renderDatasetsScreen(); showScreen('datasets'); });
-
-el.selectAllBtn.addEventListener('click', () => { state.datasets.forEach(d=>state.selected.add(d.name)); renderDatasetsScreen(); });
-el.selectNoneBtn.addEventListener('click', () => { state.selected.clear(); renderDatasetsScreen(); });
-el.applySetsBtn.addEventListener('click', () => { rebuildActiveQuestions(); renderModeSummary(); showScreen('modes'); });
-
-el.startOpen.addEventListener('click', () => switchMode('open'));
-el.startTest.addEventListener('click', () => switchMode('test'));
-el.modeOpen.addEventListener('click', () => switchMode('open'));
-el.modeTest.addEventListener('click', () => switchMode('test'));
-el.resetBtn.addEventListener('click', resetToModeSelection);
-
-// Theme toggle
-el.themeToggle.addEventListener('click', toggleTheme);
-
-// Open Play controls
-el.flipBtn.addEventListener('click', () => {
-  if(!state.loaded || state.mode!=='open') return;
-  state.flipped = !state.flipped;
-  el.flipBtn.setAttribute('aria-pressed', String(state.flipped));
-  renderOpenCard();
-});
-el.nextBtn.addEventListener('click', nextOpen);
-
-// Results
-el.retakeBtn.addEventListener('click', () => { startTestRun(true); });
-el.backToModesBtn.addEventListener('click', () => { showScreen('modes'); });
-
-// Debug
-el.debugBtn.addEventListener('click', () => {
-  el.debugPanel.classList.toggle('show');
-  renderDebug();
-});
-
-/* ============
-   Auto-load CSVs hosted alongside index.html
-   >>> Set your repo filenames here <<<
-   ============ */
-const AUTO_CSVS = ['mbf_exam_1.csv', 'mbf_exam_2.csv'];
-
-  // Optional logo shown in the welcome popup.
-// Put your image in the repo and set this path (e.g., 'logo.png' or 'img/logo.png').
-const LOGO_URL = ''; // set later to 'logo.png'
-
-/* Auto-loader that reports per-file status and applies selection */
-async function tryAutoLoadMany(){
-  const statuses = []; // [["file","OK (N rows)"] or ["file","HTTP 404"], ...]
-  if(!AUTO_CSVS.length) return;
-
-  for (const fname of AUTO_CSVS){
-    try{
-      const res = await fetch(fname, { cache:'no-store' });
-      if(!res.ok){ statuses.push([fname, `HTTP ${res.status}`]); continue; }
-
-      const text = await res.text();
-      const raw = parseCSV(text);
-      if(!raw.length){ statuses.push([fname, 'Empty CSV']); continue; }
-
-      let rows;
-      try {
-        rows = normalizeRows(raw, fname);   // validates required columns
-      } catch (e) {
-        statuses.push([fname, `Schema error: ${e.message}`]);
-        continue;
+      function coerceAnswer({A,B,C,D,raw}) {
+        if (!raw) return "A";
+        let s = String(raw).trim();
+        const letters = s.toUpperCase().replace(/[^A-D,; ]/g, "").split(/[;, ]+/).filter(Boolean);
+        if (letters.length && ["A","B","C","D"].includes(letters[0])) return letters[0];
+        const up = s.toUpperCase();
+        if (up === String(A||"").toUpperCase()) return "A";
+        if (up === String(B||"").toUpperCase()) return "B";
+        if (up === String(C||"").toUpperCase()) return "C";
+        if (up === String(D||"").toUpperCase()) return "D";
+        return "A";
       }
-      if(!rows.length){ statuses.push([fname, 'No valid rows']); continue; }
 
-      const dsObj = { name: fname, rows, count: rows.length };
-      const i = state.datasets.findIndex(d => d.name === fname);
-      if(i >= 0) state.datasets[i] = dsObj; else state.datasets.push(dsObj);
-      state.selected.add(fname);
-      statuses.push([fname, `OK (${rows.length} rows)`]);
-
-    }catch(err){
-      statuses.push([fname, `Load error: ${err.message}`]);
+      return lines.map((cols, i) => {
+        const q  = (idxQ >= 0 ? cols[idxQ] : "").trim();
+        if (!q) return null;
+        const A  = (idxA >= 0 ? cols[idxA] : "").trim();
+        const B  = (idxB >= 0 ? cols[idxB] : "").trim();
+        const C  = (idxC >= 0 ? cols[idxC] : "").trim();
+        const D  = (idxD >= 0 ? cols[idxD] : "").trim();
+        const rawAns = (idxAns >= 0 ? cols[idxAns] : "").trim();
+        const answer = coerceAnswer({A,B,C,D,raw:rawAns});
+        const uid = (idxId >= 0 && cols[idxId]) ? `id_${cols[idxId]}` : `c_${i}_${q.slice(0,16)}`;
+        return { id: uid, q, a:A, b:B, c:C, d:D, answer };
+      }).filter(Boolean);
     }
-  }
 
-  // Console summary for devs
-  if (statuses.length) {
-    try { console.table(statuses.map(([file,status]) => ({ file, status }))); } catch(_) {}
-  }
+    /* ==========================
+       MEMORY (localStorage)
+    ========================== */
+    const MEM_KEYS = {
+      SELECTED_SETS: "fj_selected_sets",
+      OPENPLAY_STATE: "fj_openplay_state"
+    };
+    const loadJSON = (k,f)=>{ try{const v=localStorage.getItem(k); return v?JSON.parse(v):f;}catch{return f;} };
+    const saveJSON = (k,v)=>{ try{localStorage.setItem(k, JSON.stringify(v));}catch{} };
 
-  // Show a short status summary in the datasets UI (if present)
-  const ok = statuses.filter(s => s[1].startsWith('OK')).length;
-  const bad = statuses.length - ok;
-  if (document.getElementById('dsHint')) {
-    const bullets = statuses.map(([f,s]) => `${f}: ${s}`).join(' • ');
-    document.getElementById('dsHint').textContent =
-      (statuses.length ? `Auto-load: ${bullets}` : 'Select the sets you want to include.');
-  }
-
-  if(ok){
-    rebuildActiveQuestions();
-    renderDatasetsScreen();
-    renderModeSummary();
-    showScreen('modes');
-    updateEnablement();
-  }
-}
-
-/* ============
-   Screens & UI
-   ============ */
-function showScreen(which){
-  [el.screenPreload, el.screenDatasets, el.screenModes, el.screenOpen, el.screenTest, el.screenResults]
-    .forEach(s=>s.classList.add('hidden'));
-  if(which==='preload') el.screenPreload.classList.remove('hidden');
-  else if(which==='datasets') el.screenDatasets.classList.remove('hidden');
-  else if(which==='modes') el.screenModes.classList.remove('hidden');
-  else if(which==='open') el.screenOpen.classList.remove('hidden');
-  else if(which==='test') el.screenTest.classList.remove('hidden');
-  else if(which==='results') el.screenResults.classList.remove('hidden');
-}
-function updateEnablement(){
-  const hasAnyDS = state.datasets.length > 0;
-  const hasAnySelected = state.selected.size > 0;
-  el.datasetsBtn.disabled = !hasAnyDS;
-  el.applySetsBtn.disabled = !hasAnySelected;
-  [el.modeOpen, el.modeTest, el.resetBtn, el.startOpen, el.startTest]
-    .forEach(b => b.disabled = !hasAnySelected || !state.loaded);
-}
-function renderDatasetsScreen(){
-  el.dsList.innerHTML = "";
-  if(!state.datasets.length){
-    el.dsHint.textContent = 'No datasets found here yet.';
-    el.selectedSummary.textContent = '0 selected • 0 cards';
-    el.applySetsBtn.disabled = true;
-    return;
-  }
-
-  let totalSelected = 0;
-  let totalCards = 0;
-
-  state.datasets.forEach(ds => {
-    const checked = state.selected.has(ds.name);
-    if(checked){ totalSelected++; totalCards += ds.count; }
-
-    // Row container (label makes whole row clickable)
-    const item = document.createElement('label');
-    item.className = 'ds-item';
-
-    const left = document.createElement('div');
-    left.className = 'ds-left';
-
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = checked;
-    cb.setAttribute('aria-label', `Select dataset ${ds.name}`);
-    cb.addEventListener('change', () => {
-      if(cb.checked) state.selected.add(ds.name);
-      else state.selected.delete(ds.name);
-      renderDatasetsScreen();
-    });
-
-    const name = document.createElement('div');
-    name.className = 'ds-name';
-    name.textContent = ds.name;
-
-    const count = document.createElement('div');
-    count.className = 'ds-count';
-    count.textContent = `${ds.count} cards`;
-
-    left.appendChild(cb);
-    left.appendChild(name);
-    left.appendChild(count);
-
-    item.appendChild(left);
-    el.dsList.appendChild(item);
-  });
-
-  el.selectedSummary.textContent = `${totalSelected} selected • ${totalCards} cards`;
-  updateEnablement();
-}
-function renderModeSummary(){
-  const selectedSets = state.datasets.filter(d => state.selected.has(d.name));
-  const cards = selectedSets.reduce((a,b)=>a+b.count,0);
-  el.modeSummary.textContent = `Sets: ${selectedSets.length} selected • ${cards} cards`;
-}
-
-/* ============
-   Mode switching
-   ============ */
-function switchMode(mode){
-  if(!state.loaded){ showScreen('datasets'); return; }
-  if(mode==='open'){
-    state.mode = 'open';
-    el.modeOpen.setAttribute('aria-pressed','true');
-    el.modeTest.setAttribute('aria-pressed','false');
-    startOpenRun();
-  }else if(mode==='test'){
-    state.mode = 'test';
-    el.modeOpen.setAttribute('aria-pressed','false');
-    el.modeTest.setAttribute('aria-pressed','true');
-    startTestRun(true);
-  }
-  renderDebug();
-}
-function resetToModeSelection(){
-  if(!state.loaded){ showScreen('datasets'); return; }
-  state.mode = null;
-  el.modeOpen.setAttribute('aria-pressed','false');
-  el.modeTest.setAttribute('aria-pressed','false');
-  resetRunKeepData();
-  renderModeSummary();
-  showScreen('modes');
-  renderDebug();
-}
-
-/* ============
-   OPEN PLAY MODE
-   ============ */
-function startOpenRun(){
-  resetRunKeepData();
-  showScreen('open');
-  renderOpenCard();
-}
-function renderOpenCard(){
-  const idxQ = state.order[state.current];
-  const row = state.questions[idxQ];
-  const invalid = validateRow(row);
-  if(invalid){
-    el.metaOpenId.textContent = "ID —";
-    el.metaOpenSource.textContent = "";
-    el.metaOpenSet.textContent = "";
-    el.qTextOpen.textContent = invalid;
-    el.optsOpen.innerHTML = "";
-    el.openProgress.textContent = "";
-    return;
-  }
-  el.metaOpenId.textContent = `ID ${row.id}`;
-  el.metaOpenSource.textContent = row.source ? `Source: ${row.source}` : "";
-  el.metaOpenSet.textContent = row.dataset ? `Set: ${row.dataset}` : "";
-  el.qTextOpen.textContent = row.question;
-  el.optsOpen.innerHTML = "";
-  row.options.forEach(opt => {
-    const b = document.createElement('button');
-    b.className = 'opt';
-    b.type = 'button';
-    b.disabled = true;
-    b.setAttribute('aria-disabled','true');
-    const badge = document.createElement('span');
-    badge.className = 'badge'; badge.textContent = opt.letter;
-    const span = document.createElement('span');
-    span.textContent = opt.text;
-    b.appendChild(badge); b.appendChild(span);
-    if(state.flipped && opt.letter === row.correctPrimary){
-      b.classList.add('correct');
-      b.setAttribute('aria-label', 'Correct answer');
-    }else{
-      b.classList.remove('correct');
+    /* ==========================
+       Fetch + Load
+    ========================== */
+    async function fetchWithFallback(ds) {
+      try {
+        const r = await fetch(ds.path, { cache: "no-store" });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r.text();
+      } catch {
+        const raw = RAW_FALLBACK[ds.id];
+        const r2 = await fetch(raw, { cache: "no-store" });
+        if (!r2.ok) throw new Error(`Fallback HTTP ${r2.status}`);
+        return await r2.text();
+      }
     }
-    el.optsOpen.appendChild(b);
-  });
-  el.openProgress.textContent = `Card ${state.current+1} of ${state.order.length}`;
-}
-function nextOpen(){
-  state.current++;
-  state.flipped = false;
-  el.flipBtn.setAttribute('aria-pressed','false');
-  if(state.current >= state.order.length){ resetRunKeepData(); }
-  renderOpenCard();
-}
 
-/* ============
-   TEST MODE
-   ============ */
-function startTestRun(reshuffle=false){
-  if(reshuffle) resetRunKeepData();
-  state.answers.clear();
-  showScreen('test');
-  renderTestCard();
-}
-function renderTestCard(){
-  if(state.current >= state.order.length){ showResults(); return; }
-  const idxQ = state.order[state.current];
-  const row = state.questions[idxQ];
-  const invalid = validateRow(row);
-  if(invalid){ state.current++; renderTestCard(); return; }
-  el.metaTestId.textContent = `ID ${row.id}`;
-  el.metaTestSource.textContent = row.source ? `Source: ${row.source}` : "";
-  el.metaTestSet.textContent = row.dataset ? `Set: ${row.dataset}` : "";
-  el.testProgress.textContent = `Card ${state.current+1} of ${state.order.length}`;
-  el.qTextTest.textContent = row.question;
-  el.optsTest.innerHTML = "";
-  row.options.forEach(opt => {
-    const btn = document.createElement('button');
-    btn.className = 'opt';
-    btn.type = 'button';
-    btn.dataset.letter = opt.letter;
-    btn.setAttribute('aria-label', `Choose option ${opt.letter}`);
-    const badge = document.createElement('span');
-    badge.className = 'badge'; badge.textContent = opt.letter;
-    const span = document.createElement('span');
-    span.textContent = opt.text;
-    btn.appendChild(badge); btn.appendChild(span);
-    btn.addEventListener('click', () => {
-      lockChoices(el.optsTest);
-      state.answers.set(idxQ, { letter: opt.letter, ts: Date.now() });
-      setTimeout(() => { state.current++; renderTestCard(); }, state.autoAdvanceMs);
+    async function loadAll() {
+      try {
+        const results = await Promise.all(DATASETS.map(async ds => {
+          const text = await fetchWithFallback(ds);
+          const cards = parseCSV(text);
+          if (!cards.length) throw new Error(`${ds.label} parsed 0 cards`);
+          return { id: ds.id, short: ds.short, label: ds.label, cards };
+        }));
+
+        loadedSets = results;
+
+        // Restore selected sets from memory, else default to "all"
+        const savedSetIds = loadJSON(MEM_KEYS.SELECTED_SETS, null);
+        selectedSetIds.clear();
+        if (Array.isArray(savedSetIds) && savedSetIds.length) {
+          const validIds = new Set(results.map(s => s.id));
+          savedSetIds.forEach(id => { if (validIds.has(id)) selectedSetIds.add(id); });
+          if (selectedSetIds.size === 0) results.forEach(s => selectedSetIds.add(s.id));
+        } else {
+          results.forEach(s => selectedSetIds.add(s.id));
+        }
+
+        state.cards = results.flatMap(r => r.cards);
+
+        // Render (container visibility is handled by flows)
+        renderSetsSummary();
+        renderSetPills();
+        updateShuffleAvailability();
+
+      } catch (e) {
+        if ($status) $status.textContent = "Couldn’t finish loading.";
+        $error.classList.remove("hidden");
+        $error.textContent = String(e?.message || e);
+      }
+    }
+
+    /* ==========================
+       2) PILL TOGGLES (UI/Logic)
+    ========================== */
+    function renderSetsSummary() {
+      const chosen = loadedSets.filter(s => selectedSetIds.has(s.id));
+      const totalCards = chosen.reduce((sum, s) => sum + s.cards.length, 0);
+      if ($statusSummary) $statusSummary.textContent = `Ready • ${totalCards} ${totalCards === 1 ? "card" : "cards"}`;
+      updateShuffleAvailability();
+    }
+
+    function renderSetPills() {
+      const totalSets = loadedSets.length;
+      const activeCount = loadedSets.reduce((n, s) => n + (selectedSetIds.has(s.id) ? 1 : 0), 0);
+      const allActive = activeCount === totalSets && totalSets > 0;
+
+      saveJSON(MEM_KEYS.SELECTED_SETS, Array.from(selectedSetIds));
+
+      const base = "inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm transition-colors";
+      const on  = "bg-white text-zinc-900 border-black font-medium";
+      const off = "bg-white text-zinc-800 border-zinc-300 hover:bg-zinc-100";
+
+      const pillsHtml = [
+        `<button class="set-pill ${base} ${allActive ? on : off}" data-setid="__all__" role="switch" aria-pressed="${allActive}" title="Enable all sets">
+          All <span class="text-xs opacity-80">(${loadedSets.reduce((s,x)=>s+x.cards.length,0)})</span>
+        </button>`,
+        ...loadedSets.map(s => `
+          <button class="set-pill ${base} ${selectedSetIds.has(s.id) ? on : off}" data-setid="${s.id}" role="switch" aria-pressed="${selectedSetIds.has(s.id)}" title="${s.label}">
+            ${s.short} <span class="text-xs opacity-80">(${s.cards.length})</span>
+          </button>
+        `)
+      ].join("");
+
+      $setPills.innerHTML = pillsHtml;
+
+      Array.from($setPills.querySelectorAll(".set-pill")).forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-setid");
+          if (id === "__all__") {
+            const allAreOn = loadedSets.every(s => selectedSetIds.has(s.id));
+            selectedSetIds.clear();
+            if (!allAreOn) loadedSets.forEach(s => selectedSetIds.add(s.id));
+          } else {
+            if (selectedSetIds.has(id)) selectedSetIds.delete(id); else selectedSetIds.add(id);
+          }
+          renderSetsSummary();
+          renderSetPills();
+          if ($openPlayView && !$openPlayView.classList.contains("hidden")) opInjectFromSelection();
+        });
+      });
+
+      updateShuffleAvailability();
+    }
+
+    /* ==========================
+       3) SHUFFLE AVAILABILITY
+    ========================== */
+    function updateShuffleAvailability() {
+      const btn = document.getElementById("opShuffleBtn");
+      if (!btn) return;
+      const activeSets = loadedSets.filter(s => selectedSetIds.has(s.id)).length;
+      if (activeSets > 1) {
+        btn.disabled = false; btn.classList.remove("opacity-50","cursor-not-allowed");
+      } else {
+        btn.disabled = true; btn.classList.add("opacity-50","cursor-not-allowed");
+        if (op.shuffle) { op.shuffle = false; btn.textContent = "Shuffle: Off"; opBuildOrder(); opRenderCard(); }
+      }
+    }
+
+    /* =======================
+       3.5) TEST CONFIG (slider)
+    ======================= */
+    const TM_COUNTS = [20, 50, 100, 150];
+    const TM_CFG_KEYS = { COUNT_IDX: "fj_test_count_idx" };
+    const $tmCountRange = document.getElementById("tmCountRange");
+    const $tmCountLabel = document.getElementById("tmCountLabel");
+    const $tmApplyCount = document.getElementById("tmApplyCount");
+
+    // restore saved index or default to 0 (20 Qs)
+    let savedIdx = Number(localStorage.getItem(TM_CFG_KEYS.COUNT_IDX));
+    if (!Number.isInteger(savedIdx) || savedIdx < 0 || savedIdx > 3) savedIdx = 0;
+    if ($tmCountRange) $tmCountRange.value = String(savedIdx);
+    if ($tmCountLabel) $tmCountLabel.textContent = String(TM_COUNTS[savedIdx]);
+
+    $tmCountRange?.addEventListener("input", () => {
+      const idx = Number($tmCountRange.value);
+      $tmCountLabel.textContent = String(TM_COUNTS[idx]);
+      localStorage.setItem(TM_CFG_KEYS.COUNT_IDX, String(idx));
     });
-    el.optsTest.appendChild(btn);
-  });
-  renderDebug();
-}
-function lockChoices(container){
-  Array.from(container.querySelectorAll('.opt')).forEach(b => b.disabled = true);
-}
 
-/* ============
-   RESULTS
-   ============ */
-function showResults(){
-  showScreen('results');
-  let correct = 0;
-  const missed = [];
-  for(const idxQ of state.order){
-    const row = state.questions[idxQ];
-    const pick = state.answers.get(idxQ);
-    const chosen = pick?.letter || null;
-    const isRight = !!chosen && chosen === row.correctPrimary;
-    if(isRight) correct++;
-    else missed.push({ row, chosen });
+    /* =======================
+       4) OPEN PLAY
+    ======================= */
+    const OP_LOCAL_KEY = { STARS: "fj_op_stars" };
+    const opLoadSet = key => { try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch { return new Set(); } };
+    const opSaveSet = (key, set) => localStorage.setItem(key, JSON.stringify(Array.from(set)));
+
+    const op = { all: [], deck: [], order: [], i: 0, flipped: false, shuffle: false, starFilter: false, stars: opLoadSet(OP_LOCAL_KEY.STARS) };
+
+    function opBuildOrder() {
+      op.order = Array.from({length: op.deck.length}, (_, i) => i);
+      if (op.shuffle) for (let j = op.order.length - 1; j > 0; j--) { const k = Math.floor(Math.random() * (j + 1)); [op.order[j], op.order[k]] = [op.order[k], op.order[j]]; }
+      op.i = 0;
+    }
+    function opApplyFilters() { op.deck = op.starFilter ? op.all.filter(c => op.stars.has(c.id)) : op.all.slice(); opBuildOrder(); }
+    const opCurrent = () => (op.deck.length ? op.deck[op.order[op.i]] : null);
+    function opRenderProgress() { $opProgress.textContent = op.deck.length ? `${op.i + 1} / ${op.deck.length}` : "0 / 0"; }
+    function opRenderStarBtn(card) { $opStarBtn.textContent = card && op.stars.has(card.id) ? "★" : "☆"; }
+
+    function saveOpenPlayState() { const i = Math.max(0, Math.min(op.i, Math.max(0, op.deck.length - 1))); saveJSON(MEM_KEYS.OPENPLAY_STATE, { shuffle: op.shuffle, starFilter: op.starFilter, i }); }
+    function restoreOpenPlayState() { const saved = loadJSON(MEM_KEYS.OPENPLAY_STATE, null); if (!saved) return; op.shuffle = !!saved.shuffle; op.starFilter = !!saved.starFilter; op.i = Number.isInteger(saved.i) ? saved.i : 0; }
+
+    function opRenderCard() {
+      const card = opCurrent();
+      if (!card) {
+        $opFront.classList.remove("hidden"); $opBack.classList.add("hidden");
+        $opQuestion.textContent = selectedSetIds.size ? (op.starFilter ? "No starred cards yet." : "No cards available in selection.") : "No sets selected.";
+        $opOptions.innerHTML = ""; $opAnswer.textContent = ""; $opAnswerExplain.textContent = "";
+        opRenderStarBtn(null); opRenderProgress(); return;
+      }
+      $opQuestion.textContent = card.q;
+      const opts = [["A",card.a],["B",card.b],["C",card.c],["D",card.d]].filter(([_,v]) => v && v.trim().length);
+      $opOptions.innerHTML = opts.map(([k,v]) => `<li class="border rounded-lg px-3 py-2"><strong>${k}.</strong> ${v}</li>`).join("");
+      const ansKey = card.answer; const ansText = ({A:card.a,B:card.b,C:card.c,D:card.d}[ansKey]) || "";
+      $opAnswer.textContent = `${ansKey}. ${ansText}`; $opAnswerExplain.textContent = "Flip and continue.";
+      if (op.flipped) { $opFront.classList.add("hidden"); $opBack.classList.remove("hidden"); } else { $opFront.classList.remove("hidden"); $opBack.classList.add("hidden"); }
+      opRenderStarBtn(card); opRenderProgress();
+    }
+
+    const opFlip = () => { op.flipped = !op.flipped; opRenderCard(); };
+    const opNext = () => { if (!op.deck.length) return; op.i = (op.i + 1) % op.deck.length; op.flipped = false; opRenderCard(); saveOpenPlayState(); };
+    const opPrev = () => { if (!op.deck.length) return; op.i = (op.i - 1 + op.deck.length) % op.deck.length; op.flipped = false; opRenderCard(); saveOpenPlayState(); };
+    function opToggleShuffle() { op.shuffle = !op.shuffle; document.getElementById("opShuffleBtn").textContent = `Shuffle: ${op.shuffle ? "On" : "Off"}`; opBuildOrder(); op.flipped = false; opRenderCard(); saveOpenPlayState(); }
+    function opToggleStarFilter() { op.starFilter = !op.starFilter; document.getElementById("opStarFilterBtn").textContent = `Starred: ${op.starFilter ? "Only" : "All"}`; opApplyFilters(); op.flipped = false; opRenderCard(); saveOpenPlayState(); }
+    function opToggleStar() { const card = opCurrent(); if (!card) return; if (op.stars.has(card.id)) op.stars.delete(card.id); else op.stars.add(card.id); opSaveSet(OP_LOCAL_KEY.STARS, op.stars); opRenderStarBtn(card); if (op.starFilter) { opApplyFilters(); opRenderCard(); } }
+
+    function opInjectFromSelection() {
+      op.all = loadedSets.filter(s => selectedSetIds.has(s.id)).flatMap(s => s.cards.map(c => ({ ...c, id: c.id || `${c.q}:${c.answer}:${s.id}` })));
+      opApplyFilters();
+      const saved = loadJSON(MEM_KEYS.OPENPLAY_STATE, null);
+      if (saved && Number.isInteger(saved.i)) op.i = Math.max(0, Math.min(saved.i, Math.max(0, op.deck.length - 1)));
+      else op.i = 0;
+      op.flipped = false; opRenderCard(); saveOpenPlayState();
+    }
+
+async function showOpenPlay() {
+  state.mode = "open";
+
+  // 1) Show loader while datasets fetch (only if you have a loader wrap)
+  const $loadWrap = document.getElementById("loadWrap");
+  if ($loadWrap) {
+    $loadWrap.classList.remove("hidden");
+    $status.textContent = "Loading datasets…";
   }
-  const total = state.order.length;
-  const pct = Math.round((correct / total) * 100);
-  el.scoreBox.innerHTML = `
-    <div style="font-size:1.25rem; font-weight:800">${pct}%</div>
-    <div class="muted">You scored <b>${correct}</b> / ${total}</div>
-  `;
-  el.missedWrap.innerHTML = "";
-  if(missed.length === 0){
-    const div = document.createElement('div');
-    div.className = 'miss'; div.innerHTML = `<div class="q"><b>Perfect!</b> You didn’t miss any questions.</div>`;
-    el.missedWrap.appendChild(div);
-  }else{
-    missed.forEach(({row, chosen}) => {
-      const your = getLetterAndText(row, chosen);
-      const corr = getLetterAndText(row, row.correctPrimary);
-      const item = document.createElement('div');
-      item.className = 'miss';
-      item.innerHTML = `
-        <div class="meta"><span class="qid">ID ${row.id}</span> <span class="src">${row.source ? "Source: "+row.source : ""}</span> <span class="chip">${row.dataset? "Set: "+row.dataset : ""}</span></div>
-        <div class="q">${escapeHTML(row.question)}</div>
-        <div class="pair"><span class="tag">Your answer:</span> <span class="ans">${your}</span></div>
-        <div class="pair"><span class="tag">Correct:</span> <span class="ans">${corr}</span></div>
-      `;
-      el.missedWrap.appendChild(item);
+
+  if (!loadedSets.length) {
+    await loadAll();
+  }
+
+  // 2) Hide loader
+  if ($loadWrap) $loadWrap.classList.add("hidden");
+
+  // 3) Make sure only Open Play UI is visible
+  document.getElementById("testView")?.classList.add("hidden");       // hide Test
+  document.getElementById("testConfig")?.classList.add("hidden");     // hide test-only controls
+  $openPlayView.classList.remove("hidden");                            // show Open Play
+  $app.classList.remove("hidden");                                     // show filter bar
+
+  // 4) Inject cards based on current filter and restore Open Play state
+  restoreOpenPlayState();
+  opInjectFromSelection();
+
+  // 5) Buttons reflect current toggles + shuffle eligibility
+  document.getElementById("opShuffleBtn").textContent = `Shuffle: ${op.shuffle ? "On" : "Off"}`;
+  document.getElementById("opStarFilterBtn").textContent = `Starred: ${op.starFilter ? "Only" : "All"}`;
+  updateShuffleAvailability();
+
+  // 6) One-time bindings
+  if (!showOpenPlay._bound) {
+    $opCard.addEventListener("click", opFlip);
+    $opFlipBtn.addEventListener("click", opFlip);
+    $opNextBtn.addEventListener("click", opNext);
+    $opPrevBtn.addEventListener("click", opPrev);
+    $opShuffleBtn.addEventListener("click", opToggleShuffle);
+    $opStarFilterBtn.addEventListener("click", opToggleStarFilter);
+    $opStarBtn.addEventListener("click", (e) => { e.stopPropagation(); opToggleStar(); });
+
+    document.addEventListener("keydown", (e) => {
+      if ($openPlayView.classList.contains("hidden")) return;
+      if (e.key === "ArrowRight") { e.preventDefault(); opNext(); }
+      else if (e.key === "ArrowLeft") { e.preventDefault(); opPrev(); }
+      else if (e.key === " " || e.key === "Enter") { e.preventDefault(); opFlip(); }
     });
+
+    showOpenPlay._bound = true;
   }
-  renderDebug();
-}
-function getLetterAndText(row, letter){
-  if(!letter) return `<i>None</i>`;
-  const found = row.options.find(o => o.letter === letter);
-  if(!found) return `${letter}`;
-  return `<b>${letter}</b> — ${escapeHTML(found.text)}`;
-}
-function escapeHTML(str){
-  return String(str).replace(/[&<>"']/g, m => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[m]));
+
+  // Optional: scroll to top so the card is in view
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-/* ============
-   THEME — persistent light/dark
-   ============ */
-function applyTheme(theme){
-  const root = document.documentElement;
-  root.setAttribute('data-theme', theme);
-  const isLight = theme === 'light';
-  el.themeToggle.setAttribute('aria-pressed', String(isLight));
-  el.themeToggle.textContent = isLight ? '🌙 Dark' : '☀️ Light';
-  el.themeToggle.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
-  try{ localStorage.setItem('mbf_theme', theme); }catch(e){}
-}
-function toggleTheme(){
-  const current = document.documentElement.getAttribute('data-theme') || 'dark';
-  applyTheme(current === 'dark' ? 'light' : 'dark');
-}
-function initTheme(){
-  let saved = null;
-  try{ saved = localStorage.getItem('mbf_theme'); }catch(e){}
-  if(saved === 'light' || 'dark'){
-    applyTheme(saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'));
-  }
-}
 
-/* ============
-   Utilities & Debug
-   ============ */
-function renderDebug(){
-  const idxQ = state.order[state.current] ?? null;
-  const row = idxQ!=null ? state.questions[idxQ] : null;
-  const remain = state.order.length - state.current;
-  const debugObj = {
-    loaded: state.loaded,
-    mode: state.mode,
-    datasets: state.datasets.map(d=>({name:d.name,count:d.count})),
-    selected: Array.from(state.selected),
-    activeCards: state.questions.length,
-    currentIndex: state.current,
-    currentQuestionId: row?.id ?? null,
-    currentDataset: row?.dataset ?? null,
-    remainingCount: remain,
+    /* =======================
+       5) TEST MODE (no timer)
+    ======================= */
+    const TM_KEYS = { STATE: "fj_test_state" };
+
+    const $testView = document.getElementById("testView");
+    const $tmProgress = document.getElementById("tmProgress");
+    const $tmQuestion = document.getElementById("tmQuestion");
+    const $tmOptions = document.getElementById("tmOptions");
+    const $tmFlag = document.getElementById("tmFlag");
+    const $tmPrev = document.getElementById("tmPrev");
+    const $tmNext = document.getElementById("tmNext");
+    const $tmSubmitBtn = document.getElementById("tmSubmitBtn");
+    const $tmResults = document.getElementById("tmResults");
+    const $tmScore = document.getElementById("tmScore");
+    const $tmBreakdown = document.getElementById("tmBreakdown");
+    const $tmReview = document.getElementById("tmReview");
+    const $tmRestart = document.getElementById("tmRestart");
+    const $tmBackToOpen = document.getElementById("tmBackToOpen");
+
+    const test = { deck: [], i: 0, answers: new Map(), flags: new Set(), config: { count: 20 } };
+
+    function sampleFromSelectedSets(n) {
+      const pool = loadedSets.filter(s => selectedSetIds.has(s.id)).flatMap(s => s.cards.map(c => ({ ...c, id: c.id || `${c.q}:${c.answer}:${s.id}` })));
+      if (!pool.length) return [];
+      // Shuffle pool and take first n
+      for (let j = pool.length - 1; j > 0; j--) { const k = Math.floor(Math.random() * (j + 1)); [pool[j], pool[k]] = [pool[k], pool[j]]; }
+      return pool.slice(0, Math.min(n, pool.length));
+    }
+
+    function persistTestState(){
+      saveJSON(TM_KEYS.STATE,{
+        deck:test.deck, i:test.i,
+        answers:Array.from(test.answers.entries()),
+        flags:Array.from(test.flags.values())
+      });
+    }
+    function restoreTestState(){
+      const saved = loadJSON(TM_KEYS.STATE, null);
+      if (!saved || !Array.isArray(saved.deck) || !saved.deck.length) return false;
+      test.deck = saved.deck;
+      test.i = Number.isInteger(saved.i) ? Math.max(0, Math.min(saved.i, test.deck.length - 1)) : 0;
+      test.answers = new Map(saved.answers || []);
+      test.flags = new Set(saved.flags || []);
+      renderTestQuestion();
+      return true;
+    }
+
+    function showTestView(){ $openPlayView.classList.add("hidden"); $testView.classList.remove("hidden"); }
+
+    function startNewTest(){
+      // read slider index → count
+      const idx = Number(document.getElementById("tmCountRange")?.value ?? 0);
+      const count = TM_COUNTS[idx] || 20;
+      test.config.count = count;
+
+      const deck = sampleFromSelectedSets(count);
+      if (!deck.length) { alert("No cards available in your filter. Pick at least one set."); return; }
+      test.deck=deck; test.i=0; test.answers.clear(); test.flags.clear();
+      persistTestState(); renderTestQuestion();
+    }
+
+    function renderTestQuestion(){
+      const total=test.deck.length; $tmResults.classList.add("hidden");
+      if(!total){ $tmProgress.textContent="No questions"; $tmQuestion.textContent="Add sets in the filter to create a test."; $tmOptions.innerHTML=""; return; }
+      const card=test.deck[test.i]; $tmProgress.textContent=`Q ${test.i+1} / ${total}`; $tmQuestion.textContent=card.q;
+      const options=[["A",card.a],["B",card.b],["C",card.c],["D",card.d]].filter(([k,v])=>v&&v.trim().length);
+      const chosen=test.answers.get(card.id) || null;
+      $tmOptions.innerHTML=options.map(([k,v])=>`<label class="flex items-center gap-3 border rounded-lg px-3 py-2 cursor-pointer"><input type="radio" name="tmOpt" value="${k}" ${chosen===k?"checked":""}/><span><strong>${k}.</strong> ${v}</span></label>`).join("");
+      $tmOptions.querySelectorAll('input[name="tmOpt"]').forEach(inp=>{ inp.addEventListener("change",()=>{ test.answers.set(card.id, inp.value); persistTestState(); }); });
+      $tmFlag.checked=test.flags.has(card.id);
+    }
+
+    const tmPrev = ()=>{ if(!test.deck.length) return; test.i=(test.i-1+test.deck.length)%test.deck.length; renderTestQuestion(); persistTestState(); };
+    const tmNext = ()=>{ if(!test.deck.length) return; test.i=(test.i+1)%test.deck.length; renderTestQuestion(); persistTestState(); };
+    function tmToggleFlag(){ const card=test.deck[test.i]; if(!card) return; if(test.flags.has(card.id)) test.flags.delete(card.id); else test.flags.add(card.id); persistTestState(); }
+
+    function gradeTest(){ let correct=0; const rows=test.deck.map((card,idx)=>{ const chosen=test.answers.get(card.id); const isCorrect=chosen===card.answer; if(isCorrect) correct++; return {idx,card,chosen,isCorrect}; }); return {correct,total:test.deck.length,rows}; }
+    function renderResults({correct,total,rows}){
+      const pct = total ? Math.round((correct/total)*100) : 0;
+      $tmScore.textContent=`Score: ${correct} / ${total} (${pct}%)`;
+      const unanswered=rows.filter(r=>!r.chosen).length; const flagged=test.flags.size;
+      $tmBreakdown.textContent=`${unanswered} unanswered • ${flagged} flagged`;
+      $tmReview.innerHTML=rows.map(({idx,card,chosen,isCorrect})=>{
+        const ansKey=card.answer; const ansText=({A:card.a,B:card.b,C:card.c,D:card.d}[ansKey])||"";
+        const yourText=chosen ? (({A:card.a,B:card.b,C:card.c,D:card.d}[chosen])||"") : "—";
+        const badge=isCorrect?'<span class="text-green-700">Correct</span>':'<span class="text-red-700">Wrong</span>';
+        return `<div class="rounded-lg border p-3"><div class="text-sm text-neutral-500 mb-1">Q ${idx+1}</div><div class="font-medium mb-2">${card.q}</div><div class="text-sm"><strong>Correct:</strong> ${ansKey}. ${ansText}</div><div class="text-sm"><strong>Your answer:</strong> ${chosen ? chosen + ". " + yourText : "—"}</div><div class="text-sm mt-1">${badge}</div></div>`;
+      }).join("");
+      $tmResults.classList.remove("hidden");
+    }
+    function finalizeTest(){ const graded=gradeTest(); renderResults(graded); localStorage.removeItem(TM_KEYS.STATE); }
+
+  // ---------- TEST FLOW (single-view, no stacking) ----------
+function startTestFlow() {
+  state.mode = "test";
+
+  const go = async () => {
+    // show loader while datasets load (first visit)
+    $loadWrap.classList.remove("hidden");
+    $status.textContent = "Loading datasets…";
+
+    if (!loadedSets.length) await loadAll();
+
+    // reveal filter + test config, hide Open Play, show Test
+    $loadWrap.classList.add("hidden");
+    $app.classList.remove("hidden");
+    document.getElementById("testConfig").classList.remove("hidden");
+    document.getElementById("openPlayView").classList.add("hidden");
+    showTestView(); // ensures #testView is visible and focused
+
+    // restore deck only if it matches selected question count
+    const saved = loadJSON(TM_KEYS.STATE, null);
+    const idx = Number(localStorage.getItem(TM_CFG_KEYS.COUNT_IDX)) || 0;
+    const targetCount = TM_COUNTS[idx] || 20;
+
+    const canRestore = saved && Array.isArray(saved.deck) && saved.deck.length > 0;
+    const sameSize   = canRestore && saved.deck.length === targetCount;
+    const hasAnswers = canRestore && Array.isArray(saved.answers) && saved.answers.length > 0;
+
+    if (canRestore && sameSize) {
+      restoreTestState();
+    } else {
+      if (hasAnswers) {
+        const ok = confirm(
+          "You have an in-progress test saved with a different question count. " +
+          "Starting a new test will discard your answers.\n\nStart a new test now?"
+        );
+        if (!ok) return;
+      }
+      localStorage.removeItem(TM_KEYS.STATE);
+      startNewTest();
+    }
   };
-  el.debugPre.textContent = JSON.stringify(debugObj, null, 2);
+
+  // allow zero selected sets; user can pick in filter now
+  go();
 }
 
-/* Keyboard niceties */
-document.addEventListener('keydown', (e) => {
-  if((e.key === 'Enter' || e.key === ' ') && document.activeElement?.tagName === 'BUTTON'){
-    document.activeElement.click();
-    e.preventDefault();
+// ---------- Question count Apply/Enter (with warning) ----------
+function hasInProgressAnswers() {
+  if (test && test.answers && test.answers.size > 0) return true;
+  const saved = loadJSON(TM_KEYS.STATE, null);
+  if (saved && Array.isArray(saved.answers) && saved.answers.length > 0) return true;
+  return false;
+}
+
+function applyQuestionCount() {
+  const idx = Number($tmCountRange.value);
+  if (hasInProgressAnswers()) {
+    const ok = confirm(
+      "You have an in-progress test. Changing the question count will restart it and your answers will be lost.\n\nContinue?"
+    );
+    if (!ok) return;
   }
-});
-
-function openWelcome(){
-  if(!el.welcomeBackdrop) return;
-  el.welcomeBackdrop.classList.add('show');
-  document.body.style.overflow = 'hidden';
-  setWelcomeLogo();
-  // focus a safe button
-  setTimeout(()=> el.welcomeClose?.focus(), 0);
-}
-function closeWelcome(){
-  el.welcomeBackdrop?.classList.remove('show');
-  document.body.style.overflow = '';
-  try { localStorage.setItem('mbf_welcome_shown','1'); } catch {}
-}
-function setWelcomeLogo(){
-  if(!el.welcomeLogo) return;
-  if(LOGO_URL){
-    el.welcomeLogo.src = LOGO_URL;
-    el.welcomeLogo.addEventListener('error', ()=>{ el.welcomeLogo.removeAttribute('src'); }, { once:true });
-  }else{
-    el.welcomeLogo.removeAttribute('src'); // keep gray placeholder
+  localStorage.setItem(TM_CFG_KEYS.COUNT_IDX, String(idx));
+  localStorage.removeItem(TM_KEYS.STATE);
+  if (!document.getElementById("testView").classList.contains("hidden")) {
+    startNewTest();
   }
 }
-function showWelcomeIfFirstVisit(){
-  let seen = null; try { seen = localStorage.getItem('mbf_welcome_shown'); } catch {}
-  if(!seen) openWelcome();
-}
 
-// Welcome events
-document.addEventListener('keydown', (e)=>{
-  if(e.key === 'Escape' && el.welcomeBackdrop?.classList.contains('show')) closeWelcome();
-});
-el.welcomeBackdrop?.addEventListener('click', (e)=>{
-  if(e.target === el.welcomeBackdrop) closeWelcome(); // click outside to dismiss
-});
-el.welcomeClose?.addEventListener('click', ()=>{ closeWelcome(); showScreen('modes'); });
-el.welcomeOpenBtn?.addEventListener('click', ()=>{
-  closeWelcome();
-  if(state.loaded) switchMode('open'); else showScreen('modes');
-});
-el.welcomeTestBtn?.addEventListener('click', ()=>{
-  closeWelcome();
-  if(state.loaded) switchMode('test'); else showScreen('modes');
+// re-bind listeners (if not already bound)
+document.getElementById("tmApplyCount")?.addEventListener("click", applyQuestionCount);
+document.getElementById("tmCountRange")?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); applyQuestionCount(); }
 });
 
-  
-/* ============
-   Init
-   ============ */
-function init(){
-  initTheme();
-  tryAutoLoadMany().then(() => {
-    if(state.datasets.length){ renderDatasetsScreen(); }
-    showScreen(state.loaded ? 'modes' : (state.datasets.length ? 'datasets' : 'preload'));
-    updateEnablement();
-   showWelcomeIfFirstVisit(); // <-- add this line
-  });
-}
-init();
-</script>
+    // Test bindings
+    document.getElementById("tmPrev").addEventListener("click", tmPrev);
+    document.getElementById("tmNext").addEventListener("click", tmNext);
+    document.getElementById("tmFlag").addEventListener("change", tmToggleFlag);
+    document.getElementById("tmSubmitBtn").addEventListener("click", () => finalizeTest());
+    document.getElementById("tmRestart").addEventListener("click", () => { localStorage.removeItem(TM_KEYS.STATE); startNewTest(); });
+    document.getElementById("tmBackToOpen").addEventListener("click", () => {
+      $testView.classList.add("hidden");
+      document.getElementById("testConfig").classList.add("hidden");
+      $openPlayView.classList.remove("hidden");
+    });
+
+    // CTA buttons
+    document.getElementById("openPlayBtn").addEventListener("click", showOpenPlay);
+    document.getElementById("testModeBtn").addEventListener("click", () => { state.mode = "test"; startTestFlow(); });
+
+    // NOTE: no initial load — data loads after a mode is chosen
+  </script>
 </body>
 </html>
